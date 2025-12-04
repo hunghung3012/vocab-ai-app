@@ -17,12 +17,28 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
   final TextEditingController _deckNameController = TextEditingController();
 
   bool _showCardTypeSelection = false;
-  String _selectedCardType = 'flashcard'; // flashcard, multiple_choice, etc.
+  bool _showAddCards = false;
+  String _selectedCardType = 'flashcard';
   List<Map<String, dynamic>> _cards = [];
+
+  // Controllers for quick add form
+  final TextEditingController _wordController = TextEditingController();
+  final TextEditingController _definitionController = TextEditingController();
+  final TextEditingController _exampleController = TextEditingController();
+  File? _selectedImage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showDeckNameDialog();
+    });
+  }
 
   void _showDeckNameDialog() {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -40,7 +56,10 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
             child: const Text('Cancel'),
           ),
           ElevatedButton(
@@ -62,35 +81,50 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showDeckNameDialog();
-    });
-  }
-
-  void _addCard() {
+  void _selectCardType(String type) {
     setState(() {
-      _cards.add({
-        'word': '',
-        'definition': '',
-        'example': '',
-        'imageUrl': null,
-        'imageFile': null,
-      });
+      _selectedCardType = type;
+      _showCardTypeSelection = false;
+      _showAddCards = true;
     });
   }
 
-  Future<void> _pickImage(int index) async {
+  Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
 
     if (image != null) {
       setState(() {
-        _cards[index]['imageFile'] = File(image.path);
+        _selectedImage = File(image.path);
       });
     }
+  }
+
+  void _addCardToList() {
+    if (_wordController.text.isEmpty || _definitionController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter word and definition'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _cards.add({
+        'word': _wordController.text,
+        'definition': _definitionController.text,
+        'example': _exampleController.text,
+        'imageFile': _selectedImage,
+      });
+
+      // Clear form
+      _wordController.clear();
+      _definitionController.clear();
+      _exampleController.clear();
+      _selectedImage = null;
+    });
   }
 
   void _removeCard(int index) {
@@ -100,7 +134,7 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
   }
 
   Future<void> _saveDeck() async {
-    if (_deckNameController.text.isEmpty || _cards.isEmpty) {
+    if (_cards.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please add at least one card'),
@@ -110,22 +144,7 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
       return;
     }
 
-    // Check if all cards have required fields
-    for (var card in _cards) {
-      if (card['word'].toString().isEmpty ||
-          card['definition'].toString().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('All cards must have word and definition'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-    }
-
     try {
-      // Show loading
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -134,22 +153,20 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
         ),
       );
 
-      // Create deck
       final deck = Deck(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: _deckNameController.text,
         totalWords: _cards.length,
         createdDate: DateTime.now(),
-        lastStudiedDate: DateTime.now(), flashcardIds: [],
+        lastStudiedDate: DateTime.now(),
+        flashcardIds: [],
       );
 
       await _firebaseService.createDeck(deck);
 
-      // Create flashcards
       for (var cardData in _cards) {
         String? imageUrl;
 
-        // Upload image if exists
         if (cardData['imageFile'] != null) {
           imageUrl = await _firebaseService.uploadImage(
             cardData['imageFile'],
@@ -158,7 +175,8 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
         }
 
         final flashcard = Flashcard(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          id: DateTime.now().millisecondsSinceEpoch.toString() +
+              _cards.indexOf(cardData).toString(),
           word: cardData['word'],
           definition: cardData['definition'],
           example: cardData['example'].toString().isEmpty
@@ -171,7 +189,7 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
       }
 
       Navigator.pop(context); // Close loading
-      Navigator.pop(context); // Go back to dashboard
+      Navigator.pop(context); // Go back
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -180,7 +198,7 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
         ),
       );
     } catch (e) {
-      Navigator.pop(context); // Close loading
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -192,20 +210,33 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_showCardTypeSelection) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+    if (_showCardTypeSelection) {
+      return _buildCardTypeSelectionScreen();
     }
 
+    if (_showAddCards) {
+      return _buildAddCardsScreen();
+    }
+
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  Widget _buildCardTypeSelectionScreen() {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.purple,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            setState(() {
+              _showCardTypeSelection = false;
+            });
+            _showDeckNameDialog();
+          },
         ),
         title: Text(
           _deckNameController.text,
@@ -215,55 +246,308 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
           ),
         ),
       ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'Select Card Type',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Choose how you want to study',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 40),
+              _buildCardTypeCard(
+                'Flashcard',
+                'Traditional flip cards with word and definition',
+                Icons.style,
+                'flashcard',
+              ),
+              const SizedBox(height: 16),
+              _buildCardTypeCard(
+                'Multiple Choice',
+                'Test yourself with multiple choice questions',
+                Icons.quiz,
+                'multiple_choice',
+              ),
+              const SizedBox(height: 16),
+              _buildCardTypeCard(
+                'Fill in Blank',
+                'Complete sentences with the correct word',
+                Icons.edit_note,
+                'fill_blank',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardTypeCard(
+      String title, String description, IconData icon, String type) {
+    final isSelected = _selectedCardType == type;
+    return GestureDetector(
+      onTap: () => _selectCardType(type),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.purple.shade50 : Colors.white,
+          border: Border.all(
+            color: isSelected ? Colors.purple : Colors.grey.shade300,
+            width: 2,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.purple : Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? Colors.white : Colors.grey.shade600,
+                size: 32,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? Colors.purple : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              const Icon(
+                Icons.check_circle,
+                color: Colors.purple,
+                size: 28,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddCardsScreen() {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        backgroundColor: Colors.purple,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _deckNameController.text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            Text(
+              _selectedCardType == 'flashcard'
+                  ? 'Flashcard Mode'
+                  : _selectedCardType == 'multiple_choice'
+                  ? 'Multiple Choice Mode'
+                  : 'Fill in Blank Mode',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
       body: Column(
         children: [
-          // Card Type Selection
+          // Add Card Form
           Container(
-            padding: const EdgeInsets.all(16),
             color: Colors.white,
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Select Card Type',
+                  'Add New Word',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _wordController,
+                  decoration: InputDecoration(
+                    labelText: 'Word',
+                    hintText: 'e.g., Eloquent',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.text_fields),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _definitionController,
+                  decoration: InputDecoration(
+                    labelText: 'Definition',
+                    hintText: 'e.g., Speaking fluently',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.description),
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _exampleController,
+                  decoration: InputDecoration(
+                    labelText: 'Example (Optional)',
+                    hintText: 'e.g., Her speech was eloquent',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.format_quote),
+                  ),
+                  maxLines: 2,
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
-                      child: _buildCardTypeOption(
-                        'Flashcard',
-                        'flashcard',
-                        Icons.style,
+                      child: OutlinedButton.icon(
+                        onPressed: _pickImage,
+                        icon: const Icon(Icons.image),
+                        label: Text(_selectedImage == null
+                            ? 'Add Image'
+                            : 'Change Image'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildCardTypeOption(
-                        'Multiple Choice',
-                        'multiple_choice',
-                        Icons.quiz,
+                    if (_selectedImage != null) ...[
+                      const SizedBox(width: 12),
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          image: DecorationImage(
+                            image: FileImage(_selectedImage!),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildCardTypeOption(
-                        'Fill in Blank',
-                        'fill_blank',
-                        Icons.edit_note,
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            _selectedImage = null;
+                          });
+                        },
                       ),
-                    ),
+                    ],
                   ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _addCardToList,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add to List'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purple,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
 
-          // Cards List
+          // Cards List Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            color: Colors.grey[100],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Words Added (${_cards.length})',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (_cards.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _cards.clear();
+                      });
+                    },
+                    icon: const Icon(Icons.clear_all, size: 18),
+                    label: const Text('Clear All'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.red,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Cards Table
           Expanded(
             child: _cards.isEmpty
                 ? Center(
@@ -271,42 +555,157 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.style_outlined,
+                    Icons.inbox_outlined,
                     size: 80,
                     color: Colors.grey[400],
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No cards yet',
+                    'No words added yet',
                     style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
                       color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Tap the + button to add cards',
-                    style: TextStyle(color: Colors.grey[600]),
+                    'Add your first word above',
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                    ),
                   ),
                 ],
               ),
             )
-                : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _cards.length,
-              itemBuilder: (context, index) {
-                return _buildCardItem(index);
-              },
+                : ListView(
+              children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    headingRowColor: MaterialStateProperty.all(
+                      Colors.purple.shade50,
+                    ),
+                    columns: const [
+                      DataColumn(
+                        label: Text(
+                          'No.',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Word',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Definition',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Example',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Image',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Actions',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                    rows: _cards.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final card = entry.value;
+                      return DataRow(
+                        cells: [
+                          DataCell(Text('${index + 1}')),
+                          DataCell(
+                            ConstrainedBox(
+                              constraints:
+                              const BoxConstraints(maxWidth: 120),
+                              child: Text(
+                                card['word'],
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            ConstrainedBox(
+                              constraints:
+                              const BoxConstraints(maxWidth: 200),
+                              child: Text(
+                                card['definition'],
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            ConstrainedBox(
+                              constraints:
+                              const BoxConstraints(maxWidth: 150),
+                              child: Text(
+                                card['example'].isEmpty
+                                    ? '-'
+                                    : card['example'],
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
+                                style: TextStyle(
+                                  color: card['example'].isEmpty
+                                      ? Colors.grey
+                                      : Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            card['imageFile'] != null
+                                ? Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                borderRadius:
+                                BorderRadius.circular(6),
+                                image: DecorationImage(
+                                  image: FileImage(
+                                      card['imageFile']),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            )
+                                : const Icon(Icons.image_not_supported,
+                                color: Colors.grey, size: 20),
+                          ),
+                          DataCell(
+                            IconButton(
+                              icon: const Icon(Icons.delete,
+                                  color: Colors.red, size: 20),
+                              onPressed: () => _removeCard(index),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addCard,
-        backgroundColor: Colors.purple,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Card'),
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
@@ -336,6 +735,7 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
             ),
             const SizedBox(width: 12),
             Expanded(
+              flex: 2,
               child: ElevatedButton(
                 onPressed: _saveDeck,
                 style: ElevatedButton.styleFrom(
@@ -345,166 +745,14 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('Create Deck'),
+                child: Text(
+                  'Create Deck (${_cards.length} cards)',
+                  style: const TextStyle(fontSize: 16),
+                ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildCardTypeOption(String label, String type, IconData icon) {
-    final isSelected = _selectedCardType == type;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedCardType = type;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.purple.shade50 : Colors.white,
-          border: Border.all(
-            color: isSelected ? Colors.purple : Colors.grey.shade300,
-            width: 2,
-          ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.purple : Colors.grey,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Colors.purple : Colors.grey[700],
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCardItem(int index) {
-    final card = _cards[index];
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Card ${index + 1}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                onPressed: () => _removeCard(index),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            decoration: InputDecoration(
-              labelText: 'Word/Term',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.all(12),
-            ),
-            onChanged: (value) {
-              _cards[index]['word'] = value;
-            },
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            decoration: InputDecoration(
-              labelText: 'Definition',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.all(12),
-            ),
-            maxLines: 2,
-            onChanged: (value) {
-              _cards[index]['definition'] = value;
-            },
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            decoration: InputDecoration(
-              labelText: 'Example (Optional)',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.all(12),
-            ),
-            maxLines: 2,
-            onChanged: (value) {
-              _cards[index]['example'] = value;
-            },
-          ),
-          const SizedBox(height: 12),
-          // Image picker
-          Row(
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _pickImage(index),
-                icon: const Icon(Icons.image),
-                label: const Text('Add Image'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                ),
-              ),
-              if (card['imageFile'] != null) ...[
-                const SizedBox(width: 12),
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    image: DecorationImage(
-                      image: FileImage(card['imageFile']),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -512,6 +760,9 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
   @override
   void dispose() {
     _deckNameController.dispose();
+    _wordController.dispose();
+    _definitionController.dispose();
+    _exampleController.dispose();
     super.dispose();
   }
 }

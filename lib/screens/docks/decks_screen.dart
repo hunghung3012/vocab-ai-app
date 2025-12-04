@@ -4,6 +4,7 @@ import 'package:vocab_ai/widgets/app_bottom_nav.dart';
 import '../../models/deck.dart';
 import '../../services/firebase_service.dart';
 import 'edit_deck_screen.dart';
+import '../../widgets/deck_settings_bottomsheet.dart';
 
 class DecksScreen extends StatefulWidget {
   const DecksScreen({Key? key}) : super(key: key);
@@ -45,7 +46,9 @@ class _DecksScreenState extends State<DecksScreen> {
           IconButton(
             icon: const Icon(Icons.add, color: Colors.purple),
             onPressed: () {
-              Navigator.pushNamed(context, '/create-deck');
+              Navigator.pushNamed(context, '/create-deck').then((_) {
+                setState(() {});
+              });
             },
           ),
         ],
@@ -97,12 +100,32 @@ class _DecksScreenState extends State<DecksScreen> {
 
                 if (decks.isEmpty) {
                   return Center(
-                    child: Text(
-                      'No decks found',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No decks found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Try a different search term',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 }
@@ -144,6 +167,7 @@ class _DecksScreenState extends State<DecksScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -156,12 +180,66 @@ class _DecksScreenState extends State<DecksScreen> {
                   ),
                 ),
               ),
+              Row(
+                children: [
+                  // Settings Button
+                  IconButton(
+                    icon: const Icon(Icons.settings, size: 20),
+                    onPressed: () {
+                      showDeckSettings(context, deck);
+                    },
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.grey[100],
+                      padding: const EdgeInsets.all(8),
+                    ),
+                    tooltip: 'Deck Settings',
+                  ),
+                  const SizedBox(width: 8),
+                  // Progress Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${deck.progress.toInt()}%',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.purple,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Stats Row
+          Row(
+            children: [
+              Icon(Icons.book, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 4),
               Text(
-                '${deck.progress.toInt()}%',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.purple,
+                '${deck.totalWords} words',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Icon(Icons.check_circle, size: 16, color: Colors.green),
+              const SizedBox(width: 4),
+              Text(
+                '${deck.masteredWords} mastered',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -169,18 +247,14 @@ class _DecksScreenState extends State<DecksScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.book, size: 16, color: Colors.grey[600]),
-              const SizedBox(width: 4),
-              Text(
-                '${deck.totalWords} words',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(width: 16),
               Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
               const SizedBox(width: 4),
               Text(
-                timeFormat.format(deck.lastStudiedDate),
-                style: TextStyle(color: Colors.grey[600]),
+                'Last studied: ${timeFormat.format(deck.lastStudiedDate)}',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 13,
+                ),
               ),
             ],
           ),
@@ -192,67 +266,101 @@ class _DecksScreenState extends State<DecksScreen> {
               color: Colors.grey[500],
             ),
           ),
-          const SizedBox(height: 12),
-          LinearProgressIndicator(
-            value: deck.progress / 100,
-            backgroundColor: Colors.grey[200],
-            valueColor: AlwaysStoppedAnimation<Color>(
-              deck.progress >= 66 ? Colors.purple : Colors.blue,
-            ),
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(4),
-          ),
+
           const SizedBox(height: 16),
+
+          // Progress Bar
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Progress',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    '${deck.masteredWords}/${deck.totalWords}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: deck.progress / 100,
+                backgroundColor: Colors.grey[200],
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  deck.progress >= 80
+                      ? Colors.green
+                      : deck.progress >= 50
+                      ? Colors.purple
+                      : Colors.blue,
+                ),
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // Action Buttons
           Row(
             children: [
               Expanded(
-                child: ElevatedButton(
+                flex: 2,
+                child: ElevatedButton.icon(
                   onPressed: () {
                     Navigator.pushNamed(
                       context,
                       '/study',
                       arguments: deck,
-                    );
+                    ).then((_) => setState(() {}));
                   },
+                  icon: const Icon(Icons.play_arrow, size: 20),
+                  label: const Text('Study'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.purple,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.play_arrow, size: 20),
-                      SizedBox(width: 4),
-                      Text('Study'),
-                    ],
-                  ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
-                child: OutlinedButton(
+                child: OutlinedButton.icon(
                   onPressed: () {
                     Navigator.pushNamed(
                       context,
                       '/quiz',
                       arguments: deck,
-                    );
+                    ).then((_) => setState(() {}));
                   },
+                  icon: const Icon(Icons.quiz, size: 18),
+                  label: const Text('Quiz'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black87,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    foregroundColor: Colors.purple,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: Colors.purple),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Quiz'),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               IconButton(
                 onPressed: () {
                   Navigator.push(
@@ -262,13 +370,16 @@ class _DecksScreenState extends State<DecksScreen> {
                     ),
                   ).then((_) => setState(() {}));
                 },
-                icon: const Icon(Icons.edit),
+                icon: const Icon(Icons.edit, size: 20),
                 style: IconButton.styleFrom(
                   backgroundColor: Colors.grey[100],
+                  foregroundColor: Colors.black87,
+                  padding: const EdgeInsets.all(14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                tooltip: 'Edit Deck',
               ),
             ],
           ),
@@ -284,39 +395,54 @@ class _DecksScreenState extends State<DecksScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.style_outlined,
-              size: 80,
-              color: Colors.grey[400],
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.purple.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.style_outlined,
+                size: 64,
+                color: Colors.purple.shade300,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               'No decks yet',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
+                color: Colors.grey[700],
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Create your first deck to get started',
-              style: TextStyle(color: Colors.grey[600]),
+              'Create your first deck to start learning',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.pushNamed(context, '/create-deck');
+                Navigator.pushNamed(context, '/create-deck').then((_) {
+                  setState(() {});
+                });
               },
-              icon: const Icon(Icons.add),
-              label: const Text('Create Deck'),
+              icon: const Icon(Icons.add, size: 24),
+              label: const Text(
+                'Create Deck',
+                style: TextStyle(fontSize: 16),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.purple,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
+                  horizontal: 32,
+                  vertical: 16,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),

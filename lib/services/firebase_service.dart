@@ -1,13 +1,14 @@
 import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/flashcard.dart';
 import '../models/deck.dart';
+import 'cloudinary_service.dart';
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final CloudinaryService _cloudinaryService = CloudinaryService();
 
   String? get userId => _auth.currentUser?.uid;
 
@@ -38,13 +39,11 @@ class FirebaseService {
   Future<void> deleteDeck(String deckId) async {
     if (userId == null) throw Exception('User not authenticated');
 
-    // Delete all flashcards in the deck
     final flashcards = await getFlashcardsByDeck(deckId);
     for (var card in flashcards) {
       await deleteFlashcard(card.id);
     }
 
-    // Delete the deck
     await _firestore
         .collection('users')
         .doc(userId)
@@ -86,7 +85,6 @@ class FirebaseService {
   Future<void> createFlashcard(Flashcard card, String deckId) async {
     if (userId == null) throw Exception('User not authenticated');
 
-    // Save flashcard
     await _firestore
         .collection('users')
         .doc(userId)
@@ -94,7 +92,6 @@ class FirebaseService {
         .doc(card.id)
         .set(card.toMap());
 
-    // Update deck's flashcard list
     final deck = await getDeck(deckId);
     if (deck != null) {
       final updatedIds = [...deck.flashcardIds, card.id];
@@ -150,6 +147,16 @@ class FirebaseService {
     return cards;
   }
 
+  // UPLOAD IMAGE TO CLOUDINARY
+  Future<String> uploadImage(File imageFile, String deckId) async {
+    try {
+      final imageUrl = await _cloudinaryService.uploadImage(imageFile);
+      return imageUrl;
+    } catch (e) {
+      throw Exception('Failed to upload image: $e');
+    }
+  }
+
   // STATISTICS
 
   Future<Map<String, dynamic>> getUserStats() async {
@@ -164,7 +171,6 @@ class FirebaseService {
       masteredWords += deck.masteredWords;
     }
 
-    // Calculate study streak
     final streakDoc = await _firestore
         .collection('users')
         .doc(userId)
@@ -176,18 +182,12 @@ class FirebaseService {
         ? (streakDoc.data()?['days'] ?? 0)
         : 0;
 
-
     return {
       'totalWords': totalWords,
       'masteredWords': masteredWords,
       'studyStreak': studyStreak,
       'totalDecks': decks.length,
     };
-  }
-  Future<String> uploadImage(File imageFile, String deckId) async {
-    // Implement upload to Firebase Storage
-    // Return image URL
-    return "x";
   }
 
   Future<void> updateStudyStreak() async {
@@ -215,19 +215,15 @@ class FirebaseService {
     final difference = now.difference(lastStudy).inDays;
 
     if (difference == 1) {
-      // Consecutive day
       await streakRef.update({
         'days': (data['days'] ?? 0) + 1,
         'lastStudyDate': now.toIso8601String(),
       });
     } else if (difference > 1) {
-      // Streak broken
       await streakRef.update({
         'days': 1,
         'lastStudyDate': now.toIso8601String(),
       });
     }
-    // Same day, no update needed
   }
-
 }
