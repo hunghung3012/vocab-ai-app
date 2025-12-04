@@ -88,7 +88,6 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
                       ),
                       maxLines: 2,
                     ),
-
                     const SizedBox(height: 16),
                     // Pick Image
                     Row(
@@ -146,16 +145,17 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
                       return;
                     }
 
-                    Navigator.pop(context); // đóng dialog nhập
+                    // 🔥 LƯU CONTEXT CỦA INPUT DIALOG
+                    final inputDialogContext = context;
 
-                    BuildContext? loadingContext;
+                    // Đóng input dialog
+                    Navigator.pop(inputDialogContext);
 
-                    // 🔥 Mở loading dialog đúng cách
+                    // 🔥 Mở loading dialog với context MỚI
                     showDialog(
-                      context: context,
+                      context: this.context, // 🔥 SỬ DỤNG this.context (context của EditDeckScreen)
                       barrierDismissible: false,
-                      builder: (ctx) {
-                        loadingContext = ctx;
+                      builder: (loadingContext) {
                         return const Center(
                           child: CircularProgressIndicator(),
                         );
@@ -186,35 +186,34 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
 
                       await _loadCards();
 
-                      // 🔥 ĐẢM BẢO đóng đúng loading dialog
-                      if (loadingContext != null) {
-                        if (loadingContext != null && Navigator.canPop(loadingContext!)) {
-                          Navigator.pop(loadingContext!);
-                        }
-
-
+                      // 🔥 Đóng loading dialog
+                      if (this.context.mounted) {
+                        Navigator.pop(this.context); // Đóng loading dialog
                       }
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Word added successfully'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
+                      // Show success message
+                      if (this.context.mounted) {
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Word added successfully'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
                     } catch (e) {
-                      if (loadingContext != null) {
-                        if (loadingContext != null && Navigator.canPop(loadingContext!)) {
-                          Navigator.pop(loadingContext!);
-                        }
-
+                      // 🔥 Đóng loading dialog khi có lỗi
+                      if (this.context.mounted) {
+                        Navigator.pop(this.context);
                       }
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      if (this.context.mounted) {
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
                     }
                   },
                 ),

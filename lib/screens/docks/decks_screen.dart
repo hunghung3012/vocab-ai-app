@@ -22,38 +22,7 @@ class _DecksScreenState extends State<DecksScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.purple,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.style, color: Colors.white),
-          ),
-        ),
-        title: const Text(
-          'My Decks',
-          style: TextStyle(
-            color: Colors.purple,
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add, color: Colors.purple),
-            onPressed: () {
-              Navigator.pushNamed(context, '/create-deck').then((_) {
-                setState(() {});
-              });
-            },
-          ),
-        ],
-      ),
+
       body: Column(
         children: [
           // Search Bar
@@ -143,7 +112,7 @@ class _DecksScreenState extends State<DecksScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: const AppBottomNav(currentIndex: 2),
+
     );
   }
 

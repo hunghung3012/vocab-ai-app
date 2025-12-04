@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:vocab_ai/screens/docks/deck_settings_bottomsheet.dart';
-import 'package:vocab_ai/widgets/DashedButton.dart';
+import 'package:vocab_ai/screens/dashboard/widgets/DashedButton.dart';
 import 'package:vocab_ai/widgets/app_bottom_nav.dart';
 import '../../models/deck.dart';
 import '../../services/firebase_service.dart';
-import 'edit_deck_screen.dart';
+import '../docks/edit_deck_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -35,34 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.purple,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.book, color: Colors.white),
-          ),
-        ),
-        title: const Text(
-          'VocabAI',
-          style: TextStyle(
-            color: Colors.purple,
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.black54),
-            onPressed: () {},
-          ),
-        ],
-      ),
+
       body: RefreshIndicator(
         onRefresh: _loadStats,
         child: SingleChildScrollView(
@@ -209,7 +182,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: const AppBottomNav(currentIndex: 1),
+
     );
   }
 

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/deck.dart';
 import '../../models/flashcard.dart';
 import '../../services/firebase_service.dart';
-import '../../services/spaced_repetition_service.dart';
+import 'service/spaced_repetition_service.dart';
 
 class StudyScreen extends StatefulWidget {
   final Deck deck;
