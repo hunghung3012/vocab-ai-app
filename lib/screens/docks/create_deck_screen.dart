@@ -371,6 +371,7 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
   Widget _buildAddCardsScreen() {
     return Scaffold(
       backgroundColor: Colors.grey[50],
+      resizeToAvoidBottomInset: true, // quan trọng để tránh overflow
       appBar: AppBar(
         backgroundColor: Colors.purple,
         elevation: 0,
@@ -403,310 +404,265 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
           ],
         ),
       ),
-      body: Column(
-        children: [
-          // Add Card Form
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Add New Word',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _wordController,
-                  decoration: InputDecoration(
-                    labelText: 'Word',
-                    hintText: 'e.g., Eloquent',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    prefixIcon: const Icon(Icons.text_fields),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _definitionController,
-                  decoration: InputDecoration(
-                    labelText: 'Definition',
-                    hintText: 'e.g., Speaking fluently',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    prefixIcon: const Icon(Icons.description),
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _exampleController,
-                  decoration: InputDecoration(
-                    labelText: 'Example (Optional)',
-                    hintText: 'e.g., Her speech was eloquent',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    prefixIcon: const Icon(Icons.format_quote),
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pickImage,
-                        icon: const Icon(Icons.image),
-                        label: Text(_selectedImage == null
-                            ? 'Add Image'
-                            : 'Change Image'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                    if (_selectedImage != null) ...[
-                      const SizedBox(width: 12),
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          image: DecorationImage(
-                            image: FileImage(_selectedImage!),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 20),
-                        onPressed: () {
-                          setState(() {
-                            _selectedImage = null;
-                          });
-                        },
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _addCardToList,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add to List'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
 
-          // Cards List Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            color: Colors.grey[100],
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Words Added (${_cards.length})',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (_cards.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _cards.clear();
-                      });
-                    },
-                    icon: const Icon(Icons.clear_all, size: 18),
-                    label: const Text('Clear All'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.red,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          // Cards Table
-          Expanded(
-            child: _cards.isEmpty
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.inbox_outlined,
-                    size: 80,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No words added yet',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add your first word above',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
               ),
-            )
-                : ListView(
-              children: [
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    headingRowColor: MaterialStateProperty.all(
-                      Colors.purple.shade50,
-                    ),
-                    columns: const [
-                      DataColumn(
-                        label: Text(
-                          'No.',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Word',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Definition',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Example',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Image',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'Actions',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                    rows: _cards.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final card = entry.value;
-                      return DataRow(
-                        cells: [
-                          DataCell(Text('${index + 1}')),
-                          DataCell(
-                            ConstrainedBox(
-                              constraints:
-                              const BoxConstraints(maxWidth: 120),
-                              child: Text(
-                                card['word'],
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      // ==========================
+                      // FORM NHẬP TỪ VỰNG
+                      // ==========================
+                      Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Add New Word',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            TextField(
+                              controller: _wordController,
+                              decoration: InputDecoration(
+                                labelText: 'Word',
+                                hintText: 'e.g., Eloquent',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                overflow: TextOverflow.ellipsis,
+                                prefixIcon: const Icon(Icons.text_fields),
                               ),
                             ),
-                          ),
-                          DataCell(
-                            ConstrainedBox(
-                              constraints:
-                              const BoxConstraints(maxWidth: 200),
-                              child: Text(
-                                card['definition'],
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 2,
+                            const SizedBox(height: 12),
+
+                            TextField(
+                              controller: _definitionController,
+                              decoration: InputDecoration(
+                                labelText: 'Definition',
+                                hintText: 'e.g., Speaking fluently',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                prefixIcon: const Icon(Icons.description),
+                              ),
+                              maxLines: 2,
+                            ),
+                            const SizedBox(height: 12),
+
+                            TextField(
+                              controller: _exampleController,
+                              decoration: InputDecoration(
+                                labelText: 'Example (Optional)',
+                                hintText: 'e.g., Her speech was eloquent',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                prefixIcon: const Icon(Icons.format_quote),
+                              ),
+                              maxLines: 2,
+                            ),
+
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: _pickImage,
+                                    icon: const Icon(Icons.image),
+                                    label: Text(
+                                      _selectedImage == null
+                                          ? 'Add Image'
+                                          : 'Change Image',
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
+                                    ),
+                                  ),
+                                ),
+                                if (_selectedImage != null) ...[
+                                  const SizedBox(width: 12),
+                                  Container(
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      image: DecorationImage(
+                                        image: FileImage(_selectedImage!),
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close, size: 20),
+                                    onPressed: () {
+                                      setState(() {
+                                        _selectedImage = null;
+                                      });
+                                    },
+                                  )
+                                ]
+                              ],
+                            ),
+
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _addCardToList,
+                                icon: const Icon(Icons.add),
+                                label: const Text('Add to List'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.purple,
+                                  padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                          DataCell(
-                            ConstrainedBox(
-                              constraints:
-                              const BoxConstraints(maxWidth: 150),
-                              child: Text(
-                                card['example'].isEmpty
-                                    ? '-'
-                                    : card['example'],
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 2,
+                          ],
+                        ),
+                      ),
+
+                      // ==========================
+                      // HEADER LIST
+                      // ==========================
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        color: Colors.grey[100],
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Words Added (${_cards.length})',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (_cards.isNotEmpty)
+                              TextButton.icon(
+                                onPressed: () {
+                                  setState(() => _cards.clear());
+                                },
+                                icon: const Icon(Icons.clear_all, size: 18),
+                                label: const Text('Clear All'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+
+                      // ==========================
+                      // TABLE LIST
+                      // ==========================
+                      if (_cards.isEmpty)
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.inbox_outlined,
+                                  size: 80, color: Colors.grey[400]),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No words added yet',
                                 style: TextStyle(
-                                  color: card['example'].isEmpty
-                                      ? Colors.grey
-                                      : Colors.black87,
+                                  fontSize: 18,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                            ),
-                          ),
-                          DataCell(
-                            card['imageFile'] != null
-                                ? Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                borderRadius:
-                                BorderRadius.circular(6),
-                                image: DecorationImage(
-                                  image: FileImage(
-                                      card['imageFile']),
-                                  fit: BoxFit.cover,
-                                ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Add your first word above',
+                                style: TextStyle(color: Colors.grey[500]),
                               ),
-                            )
-                                : const Icon(Icons.image_not_supported,
-                                color: Colors.grey, size: 20),
+                            ],
                           ),
-                          DataCell(
-                            IconButton(
-                              icon: const Icon(Icons.delete,
-                                  color: Colors.red, size: 20),
-                              onPressed: () => _removeCard(index),
-                            ),
+                        )
+                      else
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            headingRowColor:
+                            MaterialStateProperty.all(Colors.purple.shade50),
+                            columns: const [
+                              DataColumn(label: Text('No.')),
+                              DataColumn(label: Text('Word')),
+                              DataColumn(label: Text('Definition')),
+                              DataColumn(label: Text('Example')),
+                              DataColumn(label: Text('Image')),
+                              DataColumn(label: Text('Actions')),
+                            ],
+                            rows: _cards.asMap().entries.map((entry) {
+                              final index = entry.key;
+                              final card = entry.value;
+
+                              return DataRow(cells: [
+                                DataCell(Text('${index + 1}')),
+                                DataCell(Text(card['word'])),
+                                DataCell(Text(card['definition'])),
+                                DataCell(Text(card['example'].isEmpty
+                                    ? '-'
+                                    : card['example'])),
+                                DataCell(card['imageFile'] != null
+                                    ? Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    borderRadius:
+                                    BorderRadius.circular(6),
+                                    image: DecorationImage(
+                                      image: FileImage(card['imageFile']),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                )
+                                    : const Icon(Icons.image_not_supported,
+                                    color: Colors.grey, size: 20)),
+                                DataCell(
+                                  IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
+                                    onPressed: () => _removeCard(index),
+                                  ),
+                                )
+                              ]);
+                            }).toList(),
                           ),
-                        ],
-                      );
-                    }).toList(),
+                        ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            );
+          },
+        ),
       ),
+
+      // ==========================
+      // NÚT LƯU
+      // ==========================
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -756,6 +712,7 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
       ),
     );
   }
+
 
   @override
   void dispose() {
