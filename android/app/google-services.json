@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "102483333758",
+    "project_id": "vocab-app-a8601",
+    "storage_bucket": "vocab-app-a8601.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:102483333758:android:aa14ae116c94347783fe2f",
+        "android_client_info": {
+          "package_name": "com.example.vocab_ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDdAxto3R1jZZzgbpFGuPZaZr_VL-OP3OQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
