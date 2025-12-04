@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:vocab_ai/screens/docks/deck_settings_bottomsheet.dart';
 import 'package:vocab_ai/widgets/DashedButton.dart';
 import 'package:vocab_ai/widgets/app_bottom_nav.dart';
 import '../../models/deck.dart';
@@ -88,13 +89,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Action Buttons - 2 rows
+                // Action Buttons
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    // ThÃƒÂªm chÃƒÂºt bÃƒÂ³ng Ã„â€˜Ã¡Â»â€¢ nhÃ¡ÂºÂ¹ cho container nÃ¡Â»â€¢i bÃ¡ÂºÂ­t hÃ†Â¡n (tÃƒÂ¹y chÃ¡Â»Ân)
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.05),
@@ -105,25 +105,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   child: Column(
                     children: [
-                      // Button 1: Create New Deck (MÃƒ u TÃƒÂ­m)
                       DashedButton(
                         text: 'Create New Deck',
                         icon: Icons.add,
-                        color: const Color(0xFF9333EA), // MÃƒÂ£ mÃƒ u tÃƒÂ­m giÃ¡Â»â€˜ng design
+                        color: const Color(0xFF9333EA),
                         onTap: () {
-                          Navigator.pushNamed(context, '/create-deck');
+                          Navigator.pushNamed(context, '/create-deck')
+                              .then((_) => _loadStats());
                         },
                       ),
-
-                      const SizedBox(height: 16), // TÃ„Æ’ng khoÃ¡ÂºÂ£ng cÃƒÂ¡ch lÃƒÂªn chÃƒÂºt cho thoÃƒÂ¡ng
-
-                      // Button 2: Import Anki Deck (MÃƒ u Xanh DÃ†Â°Ã†Â¡ng)
+                      const SizedBox(height: 16),
                       DashedButton(
                         text: 'Import Anki Deck',
-                        icon: Icons.file_upload_outlined, // Icon upload giÃ¡Â»â€˜ng design hÃ†Â¡n
-                        color: const Color(0xFF2563EB), // MÃƒÂ£ mÃƒ u xanh dÃ†Â°Ã†Â¡ng giÃ¡Â»â€˜ng design
+                        icon: Icons.file_upload_outlined,
+                        color: const Color(0xFF2563EB),
                         onTap: () {
-                          Navigator.pushNamed(context, '/import-anki');
+                          Navigator.pushNamed(context, '/import-anki')
+                              .then((_) => _loadStats());
                         },
                       ),
                     ],
@@ -167,7 +165,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 const SizedBox(height: 32),
 
-                // Decks List
+                // Decks List Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -212,44 +210,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
       bottomNavigationBar: const AppBottomNav(currentIndex: 1),
-
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Colors.purple,
-            width: 2,
-            style: BorderStyle.solid,
-          ),
-          borderRadius: BorderRadius.circular(12),
-          color: Colors.transparent,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.purple, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.purple,
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -297,7 +257,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildDeckCard(Deck deck) {
     final dateFormat = DateFormat('MMM dd, yyyy');
-    final timeFormat = DateFormat('h \'hours ago\'');
+    final timeFormat = DateFormat('h:mm a');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -316,6 +276,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -328,112 +289,187 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-              Text(
-                '${deck.progress.toInt()}%',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.purple,
-                ),
+              Row(
+                children: [
+                  // Settings Button
+                  IconButton(
+                    icon: const Icon(Icons.settings, size: 20),
+                    onPressed: () {
+                      showDeckSettings(context, deck);
+                    },
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.grey[100],
+                      padding: const EdgeInsets.all(8),
+                    ),
+                    tooltip: 'Deck Settings',
+                  ),
+                  const SizedBox(width: 8),
+                  // Progress Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${deck.progress.toInt()}%',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.purple,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+
+          // Stats Row
           Row(
             children: [
               Icon(Icons.book, size: 16, color: Colors.grey[600]),
               const SizedBox(width: 4),
               Text(
                 '${deck.totalWords} words',
-                style: TextStyle(color: Colors.grey[600]),
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
               ),
               const SizedBox(width: 16),
-              Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+              Icon(Icons.check_circle, size: 16, color: Colors.green),
               const SizedBox(width: 4),
               Text(
-                timeFormat.format(deck.lastStudiedDate),
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                dateFormat.format(deck.createdDate),
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Text(
-                'Progress',
+                '${deck.masteredWords} mastered',
                 style: TextStyle(
-                  fontSize: 12,
                   color: Colors.grey[600],
+                  fontSize: 14,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          LinearProgressIndicator(
-            value: deck.progress / 100,
-            backgroundColor: Colors.grey[200],
-            valueColor: AlwaysStoppedAnimation<Color>(
-              deck.progress >= 66 ? Colors.purple : Colors.blue,
-            ),
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(4),
+          Row(
+            children: [
+              Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 4),
+              Text(
+                'Last studied: ${timeFormat.format(deck.lastStudiedDate)}',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 13,
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 4),
+          Text(
+            'Created: ${dateFormat.format(deck.createdDate)}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[500],
+            ),
+          ),
+
           const SizedBox(height: 16),
+
+          // Progress Bar
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Progress',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    '${deck.masteredWords}/${deck.totalWords}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: deck.progress / 100,
+                backgroundColor: Colors.grey[200],
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  deck.progress >= 80
+                      ? Colors.green
+                      : deck.progress >= 50
+                      ? Colors.purple
+                      : Colors.blue,
+                ),
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // Action Buttons
           Row(
             children: [
               Expanded(
-                child: ElevatedButton(
+                flex: 2,
+                child: ElevatedButton.icon(
                   onPressed: () {
                     Navigator.pushNamed(
                       context,
                       '/study',
                       arguments: deck,
-                    );
+                    ).then((_) => _loadStats());
                   },
+                  icon: const Icon(Icons.play_arrow, size: 20),
+                  label: const Text('Study'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.purple,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.play_arrow, size: 20),
-                      SizedBox(width: 4),
-                      Text('Study Now'),
-                    ],
-                  ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
-                child: OutlinedButton(
+                child: OutlinedButton.icon(
                   onPressed: () {
                     Navigator.pushNamed(
                       context,
                       '/quiz',
                       arguments: deck,
-                    );
+                    ).then((_) => _loadStats());
                   },
+                  icon: const Icon(Icons.quiz, size: 18),
+                  label: const Text('Quiz'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black87,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    foregroundColor: Colors.purple,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: Colors.purple),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Quiz'),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               IconButton(
                 onPressed: () {
                   Navigator.push(
@@ -443,13 +479,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ).then((_) => _loadStats());
                 },
-                icon: const Icon(Icons.edit),
+                icon: const Icon(Icons.edit, size: 20),
                 style: IconButton.styleFrom(
                   backgroundColor: Colors.grey[100],
+                  foregroundColor: Colors.black87,
+                  padding: const EdgeInsets.all(14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                tooltip: 'Edit Deck',
               ),
             ],
           ),
@@ -464,30 +503,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
         padding: const EdgeInsets.all(32),
         child: Column(
           children: [
-            Icon(
-              Icons.library_books_outlined,
-              size: 80,
-              color: Colors.grey[400],
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.purple.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.library_books_outlined,
+                size: 64,
+                color: Colors.purple.shade300,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               'No decks yet',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
+                color: Colors.grey[700],
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Create your first deck to get started',
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
       ),
     );
   }
-
-
 }

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:vocab_ai/screens/docks/deck_settings_bottomsheet.dart';
 import 'package:vocab_ai/widgets/app_bottom_nav.dart';
 import '../../models/deck.dart';
 import '../../services/firebase_service.dart';
 import 'edit_deck_screen.dart';
-import '../../widgets/deck_settings_bottomsheet.dart';
+
 
 class DecksScreen extends StatefulWidget {
   const DecksScreen({Key? key}) : super(key: key);

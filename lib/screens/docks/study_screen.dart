@@ -440,55 +440,75 @@ class _StudyScreenState extends State<StudyScreen> {
                             ),
                           ),
                         ] else ...[
-                          Text(
-                            currentCard.word,
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
+                          Expanded(
+                            child: SingleChildScrollView(
+                              physics: const BouncingScrollPhysics(),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    currentCard.word,
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 24),
+
+                                  // Definition
+                                  Text(
+                                    currentCard.definition,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey[800],
+                                      height: 1.5,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+
+                                  // Example
+                                  if (currentCard.example != null && currentCard.example!.isNotEmpty) ...[
+                                    const SizedBox(height: 24),
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[100],
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        '"${currentCard.example}"',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[700],
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ],
+
+                                  // Image with max height
+                                  if (currentCard.imageUrl != null && currentCard.imageUrl!.isNotEmpty) ...[
+                                    const SizedBox(height: 24),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.network(
+                                        currentCard.imageUrl!,
+                                        height: 220,            // giới hạn chiều cao → KHÔNG BAO GIỜ TRÀN
+                                        width: double.infinity,
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                  ],
+
+                                  const SizedBox(height: 16),
+                                ],
+                              ),
                             ),
-                            textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 24),
-                          Text(
-                            currentCard.definition,
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[800],
-                              height: 1.5,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          if (currentCard.example != null && currentCard.example!.isNotEmpty) ...[
-                            const SizedBox(height: 24),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '"${currentCard.example}"',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[700],
-                                  fontStyle: FontStyle.italic,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
-                          if (currentCard.imageUrl != null && currentCard.imageUrl!.isNotEmpty) ...[
-                            const SizedBox(height: 24),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                currentCard.imageUrl!,
-                                height: 200,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ],
-                        ],
+                        ]
+                        ,
                       ],
                     ),
                   ),

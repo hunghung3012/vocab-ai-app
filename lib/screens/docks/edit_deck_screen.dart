@@ -66,71 +66,31 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Word',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                     TextField(
                       controller: wordController,
-                      decoration: InputDecoration(
-                        hintText: 'e.g., Eloquent',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                      decoration: const InputDecoration(
+                        labelText: 'Word',
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Definition',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     TextField(
                       controller: definitionController,
-                      decoration: InputDecoration(
-                        hintText: 'e.g., Speaking fluently',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                      decoration: const InputDecoration(
+                        labelText: 'Definition',
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Example (Optional)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     TextField(
                       controller: exampleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Example (Optional)',
+                      ),
                       maxLines: 2,
-                      decoration: InputDecoration(
-                        hintText: 'e.g., Her speech was eloquent',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
                     ),
+
                     const SizedBox(height: 16),
-                    const Text(
-                      'Image (Optional)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    // Pick Image
                     Row(
                       children: [
                         OutlinedButton.icon(
@@ -173,6 +133,7 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
+                  child: const Text('Add'),
                   onPressed: () async {
                     if (wordController.text.isEmpty ||
                         definitionController.text.isEmpty) {
@@ -185,42 +146,54 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
                       return;
                     }
 
-                    try {
-                      // Show loading
-                      Navigator.pop(context);
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (context) => const Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                      );
+                    Navigator.pop(context); // đóng dialog nhập
 
-                      String? imageUrl;
-                      if (selectedImage != null) {
-                        imageUrl = await _firebaseService.uploadImage(
-                          selectedImage!,
-                          widget.deck.id,
+                    BuildContext? loadingContext;
+
+                    // 🔥 Mở loading dialog đúng cách
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (ctx) {
+                        loadingContext = ctx;
+                        return const Center(
+                          child: CircularProgressIndicator(),
                         );
+                      },
+                    );
+
+                    try {
+                      String? imageUrl;
+
+                      if (selectedImage != null) {
+                        imageUrl = await _firebaseService
+                            .uploadImage(selectedImage!, widget.deck.id)
+                            .timeout(const Duration(seconds: 12));
                       }
 
                       final newCard = Flashcard(
                         id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        word: wordController.text,
-                        definition: definitionController.text,
-                        example: exampleController.text.isEmpty
+                        word: wordController.text.trim(),
+                        definition: definitionController.text.trim(),
+                        example: exampleController.text.trim().isEmpty
                             ? null
-                            : exampleController.text,
+                            : exampleController.text.trim(),
                         imageUrl: imageUrl,
                       );
 
                       await _firebaseService.createFlashcard(
-                        newCard,
-                        widget.deck.id,
-                      );
+                          newCard, widget.deck.id);
+
                       await _loadCards();
 
-                      Navigator.pop(context); // Close loading
+                      // 🔥 ĐẢM BẢO đóng đúng loading dialog
+                      if (loadingContext != null) {
+                        if (loadingContext != null && Navigator.canPop(loadingContext!)) {
+                          Navigator.pop(loadingContext!);
+                        }
+
+
+                      }
 
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -229,7 +202,13 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
                         ),
                       );
                     } catch (e) {
-                      Navigator.pop(context); // Close loading
+                      if (loadingContext != null) {
+                        if (loadingContext != null && Navigator.canPop(loadingContext!)) {
+                          Navigator.pop(loadingContext!);
+                        }
+
+                      }
+
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Error: $e'),
@@ -238,10 +217,6 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
                       );
                     }
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C3AED),
-                  ),
-                  child: const Text('Add'),
                 ),
               ],
             );
@@ -250,6 +225,7 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
       },
     );
   }
+
 
   Future<void> _updateCard(Flashcard card) async {
     try {
@@ -505,22 +481,25 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
           ],
           if (card.imageUrl != null && card.imageUrl!.isNotEmpty) ...[
             const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+            Container(
+              height: 180,                 // 🔥 khung cố định, bạn có thể chỉnh 150–250
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.grey[100],  // nền nhẹ khi ảnh nhỏ
+              ),
+              clipBehavior: Clip.hardEdge,
               child: Image.network(
                 card.imageUrl!,
-                height: 150,
-                width: double.infinity,
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,       // 🔥 không cắt ảnh
                 errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 150,
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.broken_image),
+                  return Center(
+                    child: Icon(Icons.broken_image, color: Colors.grey, size: 40),
                   );
                 },
               ),
             ),
+
           ],
         ],
       ),

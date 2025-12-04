@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
-import 'package:archive/archive_io.dart';
+import 'package:archive/archive.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
+import 'package:permission_handler/permission_handler.dart';
 import '../../models/deck.dart';
 import '../../services/firebase_service.dart';
 
@@ -23,293 +24,372 @@ class DeckSettingsBottomSheet extends StatelessWidget {
 
   DeckSettingsBottomSheet({Key? key, required this.deck}) : super(key: key);
 
+  void _log(String message) {
+    print('[EXPORT] ${DateTime.now().toString().split(' ')[1]}: $message');
+  }
+
   Future<void> _exportDeck(BuildContext context) async {
+    final totalStart = DateTime.now();
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
+    BuildContext? dialogContext;
+
     try {
       // Show loading dialog
       showDialog(
-        context: context,
+        context: rootContext,
+        useRootNavigator: true,
         barrierDismissible: false,
-        builder: (_) => const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: Colors.white),
-              SizedBox(height: 16),
-              Text(
-                'Exporting deck...',
-                style: TextStyle(color: Colors.white),
+        builder: (ctx) {
+          dialogContext = ctx;
+          return Center(
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              margin: const EdgeInsets.symmetric(horizontal: 40),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
               ),
-            ],
-          ),
-        ),
-      );
-
-      // Load flashcards
-      final cards = await _firebaseService.getFlashcardsByDeck(deck.id);
-
-      if (cards.isEmpty) {
-        Navigator.pop(context);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No cards to export'),
-              backgroundColor: Colors.orange,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text("Exporting deck...", textAlign: TextAlign.center),
+                ],
+              ),
             ),
           );
-        }
-        return;
-      }
-
-      // Get temp directory
-      final tempDir = await getTemporaryDirectory();
-      final dbPath = path.join(tempDir.path, 'collection.anki2');
-
-      // Delete old file if exists
-      final dbFile = File(dbPath);
-      if (await dbFile.exists()) {
-        await dbFile.delete();
-      }
-
-      // Create database with optimized settings
-      final db = await openDatabase(
-        dbPath,
-        version: 1,
-        onCreate: (db, version) async {
-          // Enable optimizations for faster write
-          await db.execute('PRAGMA synchronous = OFF');
-          await db.execute('PRAGMA journal_mode = MEMORY');
-          await db.execute('PRAGMA temp_store = MEMORY');
-          await db.execute('PRAGMA cache_size = 10000');
         },
       );
 
-      // Create schema in single transaction
-      await db.transaction((txn) async {
-        // Notes table
-        await txn.execute('''
-          CREATE TABLE notes (
-            id INTEGER PRIMARY KEY,
-            guid TEXT NOT NULL,
-            mid INTEGER NOT NULL,
-            mod INTEGER NOT NULL,
-            usn INTEGER NOT NULL,
-            tags TEXT NOT NULL,
-            flds TEXT NOT NULL,
-            sfld TEXT NOT NULL,
-            csum INTEGER NOT NULL,
-            flags INTEGER NOT NULL,
-            data TEXT NOT NULL
-          )
-        ''');
-
-        // Cards table
-        await txn.execute('''
-          CREATE TABLE cards (
-            id INTEGER PRIMARY KEY,
-            nid INTEGER NOT NULL,
-            did INTEGER NOT NULL,
-            ord INTEGER NOT NULL,
-            mod INTEGER NOT NULL,
-            usn INTEGER NOT NULL,
-            type INTEGER NOT NULL,
-            queue INTEGER NOT NULL,
-            due INTEGER NOT NULL,
-            ivl INTEGER NOT NULL,
-            factor INTEGER NOT NULL,
-            reps INTEGER NOT NULL,
-            lapses INTEGER NOT NULL,
-            left INTEGER NOT NULL,
-            odue INTEGER NOT NULL,
-            odid INTEGER NOT NULL,
-            flags INTEGER NOT NULL,
-            data TEXT NOT NULL
-          )
-        ''');
-
-        // Collection table
-        await txn.execute('''
-          CREATE TABLE col (
-            id INTEGER PRIMARY KEY,
-            crt INTEGER NOT NULL,
-            mod INTEGER NOT NULL,
-            scm INTEGER NOT NULL,
-            ver INTEGER NOT NULL,
-            dty INTEGER NOT NULL,
-            usn INTEGER NOT NULL,
-            ls INTEGER NOT NULL,
-            conf TEXT NOT NULL,
-            models TEXT NOT NULL,
-            decks TEXT NOT NULL,
-            dconf TEXT NOT NULL,
-            tags TEXT NOT NULL
-          )
-        ''');
-
-        // Insert collection metadata
-        final now = DateTime.now().millisecondsSinceEpoch;
-        await txn.insert('col', {
-          'id': 1,
-          'crt': now ~/ 1000,
-          'mod': now,
-          'scm': now,
-          'ver': 11,
-          'dty': 0,
-          'usn': 0,
-          'ls': 0,
-          'conf': '{"nextPos":1,"estTimes":true,"activeDecks":[1]}',
-          'models': '{"1":{"id":1,"name":"Basic","type":0,"mod":$now,"flds":[{"name":"Front","ord":0,"sticky":false},{"name":"Back","ord":1,"sticky":false}],"tmpls":[{"name":"Card 1","ord":0,"qfmt":"{{Front}}","afmt":"{{FrontSide}}<hr id=answer>{{Back}}"}]}}',
-          'decks': '{"1":{"id":1,"name":"${_escapeJson(deck.name)}","mod":$now,"conf":1}}',
-          'dconf': '{"1":{"id":1,"name":"Default","new":{"perDay":20}}}',
-          'tags': '{}'
-        });
-      });
-
-      // Bulk insert cards using batch (MUCH FASTER)
-      await db.transaction((txn) async {
-        final batch = txn.batch();
-        final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-
-        for (int i = 0; i < cards.length; i++) {
-          final card = cards[i];
-          final noteId = i + 1;
-
-          // Prepare fields: Front | Back | Example
-          String fields = '${_escapeField(card.word)}\x1f${_escapeField(card.definition)}';
-          if (card.example != null && card.example!.isNotEmpty) {
-            fields += '\x1f${_escapeField(card.example!)}';
-          }
-
-          // Insert note
-          batch.insert('notes', {
-            'id': noteId,
-            'guid': card.id,
-            'mid': 1,
-            'mod': now,
-            'usn': -1,
-            'tags': '',
-            'flds': fields,
-            'sfld': _escapeField(card.word),
-            'csum': card.word.hashCode.abs(),
-            'flags': 0,
-            'data': ''
-          });
-
-          // Insert card
-          batch.insert('cards', {
-            'id': noteId,
-            'nid': noteId,
-            'did': 1,
-            'ord': 0,
-            'mod': now,
-            'usn': -1,
-            'type': 0,
-            'queue': 0,
-            'due': noteId,
-            'ivl': 0,
-            'factor': 2500,
-            'reps': 0,
-            'lapses': 0,
-            'left': 0,
-            'odue': 0,
-            'odid': 0,
-            'flags': 0,
-            'data': ''
-          });
-        }
-
-        await batch.commit(noResult: true);
-      });
-
-      // Close database
-      await db.close();
-
-      // Create ZIP file (APKG)
-      final apkgPath = path.join(
-        tempDir.path,
-        '${deck.name.replaceAll(RegExp(r'[^\w\s-]'), '_')}.apkg',
-      );
-
-      // Delete old apkg if exists
-      final apkgFile = File(apkgPath);
-      if (await apkgFile.exists()) {
-        await apkgFile.delete();
+      // Load cards
+      final cards = await _firebaseService.getFlashcardsByDeck(deck.id);
+      if (cards.isEmpty) {
+        if (dialogContext != null) Navigator.of(dialogContext!, rootNavigator: true).pop();
+        ScaffoldMessenger.of(rootContext).showSnackBar(
+          const SnackBar(content: Text("No cards to export")),
+        );
+        return;
       }
 
-      // Create archive
-      final encoder = ZipFileEncoder();
-      encoder.create(apkgPath);
-      encoder.addFile(File(dbPath));
-      encoder.close();
+      // Create APKG file
+      final tempDir = await getTemporaryDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final dbPath = path.join(tempDir.path, "col_$timestamp.anki2");
+
+      final apkgPath = await _createApkgFile(
+        cards: cards,
+        deckName: deck.name,
+        dbPath: dbPath,
+        tempDir: tempDir,
+        timestamp: timestamp,
+      );
 
       // Close loading dialog
-      if (context.mounted) {
-        Navigator.pop(context);
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.of(dialogContext!, rootNavigator: true).pop();
       }
 
-      // Share the file
+      // Share file
       await Share.shareXFiles(
         [XFile(apkgPath)],
-        subject: '${deck.name} - Anki Deck',
-        text: 'Exported from Vocab AI',
+        subject: "${deck.name} - Anki Deck",
+        text: "${cards.length} flashcards exported!",
       );
+
+      // Cleanup
+      try {
+        await File(dbPath).delete();
+        await Future.delayed(const Duration(seconds: 1));
+        await File(apkgPath).delete();
+      } catch (_) {}
+
+      final total = DateTime.now().difference(totalStart).inSeconds;
+      ScaffoldMessenger.of(rootContext).showSnackBar(
+          SnackBar(content: Text("✅ Exported ${cards.length} cards in ${total}s"))
+      );
+
+    } catch (e) {
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.of(dialogContext!, rootNavigator: true).pop();
+      }
+      ScaffoldMessenger.of(rootContext).showSnackBar(
+        SnackBar(content: Text("Export failed: $e")),
+      );
+    }
+  }
+
+  Future<void> _exportToDevice(BuildContext context) async {
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
+    BuildContext? dialogContext;
+
+    try {
+      // Request storage permission
+      if (Platform.isAndroid) {
+        PermissionStatus status;
+
+        if (await _isAndroid13OrHigher()) {
+          status = PermissionStatus.granted;
+        } else {
+          status = await Permission.storage.request();
+
+          if (status.isDenied) {
+            ScaffoldMessenger.of(rootContext).showSnackBar(
+              const SnackBar(
+                content: Text("Storage permission is required to save files"),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            return;
+          }
+
+          if (status.isPermanentlyDenied) {
+            ScaffoldMessenger.of(rootContext).showSnackBar(
+              SnackBar(
+                content: const Text("Please enable storage permission in Settings"),
+                action: SnackBarAction(
+                  label: "Settings",
+                  onPressed: () => openAppSettings(),
+                ),
+                duration: const Duration(seconds: 5),
+              ),
+            );
+            return;
+          }
+        }
+      }
+
+      // Show loading dialog
+      showDialog(
+        context: rootContext,
+        useRootNavigator: true,
+        barrierDismissible: false,
+        builder: (ctx) {
+          dialogContext = ctx;
+          return Center(
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              margin: const EdgeInsets.symmetric(horizontal: 40),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text("Exporting to device..."),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+
+      // Load cards
+      final cards = await _firebaseService.getFlashcardsByDeck(deck.id);
+      if (cards.isEmpty) {
+        if (dialogContext != null) Navigator.of(dialogContext!, rootNavigator: true).pop();
+        ScaffoldMessenger.of(rootContext).showSnackBar(
+          const SnackBar(content: Text("No cards to export")),
+        );
+        return;
+      }
+
+      // Create APKG file
+      final tempDir = await getTemporaryDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final dbPath = path.join(tempDir.path, "col_$timestamp.anki2");
+
+      final apkgPath = await _createApkgFile(
+        cards: cards,
+        deckName: deck.name,
+        dbPath: dbPath,
+        tempDir: tempDir,
+        timestamp: timestamp,
+      );
+
+      // Get proper Downloads directory path
+      String downloadsPath;
+      if (Platform.isAndroid) {
+        downloadsPath = '/storage/emulated/0/Download';
+      } else if (Platform.isIOS) {
+        final appDocDir = await getApplicationDocumentsDirectory();
+        downloadsPath = appDocDir.path;
+      } else {
+        downloadsPath = tempDir.path;
+      }
+
+      // Ensure Downloads directory exists
+      final downloadsDir = Directory(downloadsPath);
+      if (!await downloadsDir.exists()) {
+        await downloadsDir.create(recursive: true);
+      }
+
+      final fileName = "${_sanitize(deck.name)}_$timestamp.apkg";
+      final savedPath = path.join(downloadsPath, fileName);
+
+      // Copy file to Downloads
+      await File(apkgPath).copy(savedPath);
 
       // Cleanup temp files
       try {
         await File(dbPath).delete();
         await File(apkgPath).delete();
-      } catch (e) {
-        // Ignore cleanup errors
+      } catch (_) {}
+
+      // Close loading dialog
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.of(dialogContext!, rootNavigator: true).pop();
       }
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Deck "${deck.name}" exported successfully!'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
+      // Show success message
+      ScaffoldMessenger.of(rootContext).showSnackBar(
+        SnackBar(
+          content: Text("✅ Saved to ${Platform.isAndroid ? 'Downloads' : 'Documents'}: $fileName"),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+
     } catch (e) {
-      // Close loading if still open
-      if (context.mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Export failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.of(dialogContext!, rootNavigator: true).pop();
       }
+      ScaffoldMessenger.of(rootContext).showSnackBar(
+        SnackBar(
+          content: Text("Export failed: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
-  // Helper to escape JSON strings
-  String _escapeJson(String input) {
-    return input
-        .replaceAll('\\', '\\\\')
-        .replaceAll('"', '\\"')
-        .replaceAll('\n', '\\n')
-        .replaceAll('\r', '\\r')
-        .replaceAll('\t', '\\t');
+  Future<bool> _isAndroid13OrHigher() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
-  // Helper to escape field content
-  String _escapeField(String input) {
-    return input
-        .replaceAll('\x1f', '')  // Remove field separator
-        .replaceAll('\n', '<br>')
-        .trim();
+  Future<String> _createApkgFile({
+    required List cards,
+    required String deckName,
+    required String dbPath,
+    required Directory tempDir,
+    required int timestamp,
+  }) async {
+    final dbFile = File(dbPath);
+    if (await dbFile.exists()) await dbFile.delete();
+
+    // Open database
+    final db = await openDatabase(dbPath, version: 1);
+
+    // Set PRAGMA for optimization
+    await db.rawQuery("PRAGMA synchronous = OFF");
+    await db.rawQuery("PRAGMA journal_mode = DELETE");
+    await db.rawQuery("PRAGMA temp_store = MEMORY");
+    await db.rawQuery("PRAGMA locking_mode = EXCLUSIVE");
+    await db.rawQuery("PRAGMA cache_size = -20000");
+    await db.rawQuery("PRAGMA foreign_keys = OFF");
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    // Create schema - THÊM COLUMN imageUrl vào notes table
+    await db.transaction((txn) async {
+      await txn.execute(
+          'CREATE TABLE notes (id INTEGER PRIMARY KEY, guid TEXT, mid INTEGER, mod INTEGER, usn INTEGER, tags TEXT, flds TEXT, sfld TEXT, csum INTEGER, flags INTEGER, data TEXT, imageUrl TEXT)'
+      );
+      await txn.execute(
+          'CREATE TABLE cards (id INTEGER PRIMARY KEY, nid INTEGER, did INTEGER, ord INTEGER, mod INTEGER, usn INTEGER, type INTEGER, queue INTEGER, due INTEGER, ivl INTEGER, factor INTEGER, reps INTEGER, lapses INTEGER, left INTEGER, odue INTEGER, odid INTEGER, flags INTEGER, data TEXT)'
+      );
+      await txn.execute(
+          'CREATE TABLE col (id INTEGER PRIMARY KEY, crt INTEGER, mod INTEGER, scm INTEGER, ver INTEGER, dty INTEGER, usn INTEGER, ls INTEGER, conf TEXT, models TEXT, decks TEXT, dconf TEXT, tags TEXT)'
+      );
+
+      await txn.insert("col", {
+        "id": 1,
+        "crt": now ~/ 1000,
+        "mod": now,
+        "scm": now,
+        "ver": 11,
+        "dty": 0,
+        "usn": 0,
+        "ls": 0,
+        "conf": "{}",
+        "models":
+        '{"1":{"id":1,"name":"Basic","flds":[{"name":"Front"},{"name":"Back"}],"tmpls":[{"name":"Card 1","qfmt":"{{Front}}","afmt":"{{FrontSide}}<hr>{{Back}}"}]}}',
+        "decks": '{"1":{"id":1,"name":"${_escapeJson(deckName)}"}}',
+        "dconf": "{}",
+        "tags": "{}"
+      });
+    });
+
+    // Insert cards - LƯU imageUrl vào database
+    await db.transaction((txn) async {
+      final ts = now ~/ 1000;
+
+      for (int i = 0; i < cards.length; i++) {
+        final card = cards[i];
+        final nid = i + 1;
+
+        String flds = "${_escape(card.word)}\x1f${_escape(card.definition)}";
+        if (card.example?.isNotEmpty ?? false) {
+          flds += "\x1f${_escape(card.example!)}";
+        }
+
+        // LƯU imageUrl vào column imageUrl
+        _log('Card ${i + 1}: word="${card.word}", imageUrl="${card.imageUrl ?? "null"}"');
+
+        await txn.rawInsert(
+            'INSERT INTO notes VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+            [nid, card.id, 1, ts, -1, "", flds, card.word, card.word.hashCode.abs(), 0, "", card.imageUrl ?? ""]
+        );
+
+        await txn.rawInsert(
+            'INSERT INTO cards VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            [nid, nid, 1, 0, ts, -1, 0, 0, nid, 0, 2500, 0, 0, 0, 0, 0, 0, ""]
+        );
+      }
+    });
+
+    await db.close();
+    _log('Database created with ${cards.length} cards');
+
+    // Create ZIP/APKG
+    final dbBytes = await File(dbPath).readAsBytes();
+    final archive = Archive()
+      ..addFile(ArchiveFile("collection.anki2", dbBytes.length, dbBytes));
+
+    final zipBytes = ZipEncoder().encode(archive)!;
+    final apkgPath = path.join(tempDir.path, "${_sanitize(deckName)}_$timestamp.apkg");
+    await File(apkgPath).writeAsBytes(zipBytes);
+
+    return apkgPath;
   }
+
+  String _escapeJson(String s) => s
+      .replaceAll('\\', '\\\\')
+      .replaceAll('"', '\\"')
+      .replaceAll('\n', '\\n');
+
+  String _escape(String s) => s
+      .replaceAll('\x1f', '')
+      .replaceAll('\n', '<br>')
+      .trim();
+
+  String _sanitize(String s) => s
+      .replaceAll(RegExp(r'[^\w\s-]'), '_')
+      .replaceAll(' ', '_');
 
   Future<void> _deleteDeck(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
             Icon(Icons.warning, color: Colors.red),
@@ -321,10 +401,7 @@ class DeckSettingsBottomSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Are you sure you want to delete "${deck.name}"?',
-              style: const TextStyle(fontSize: 16),
-            ),
+            Text('Are you sure you want to delete "${deck.name}"?'),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -339,10 +416,7 @@ class DeckSettingsBottomSheet extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'This action cannot be undone',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: Colors.red, fontSize: 13),
                     ),
                   ),
                 ],
@@ -369,7 +443,6 @@ class DeckSettingsBottomSheet extends StatelessWidget {
 
     if (confirm == true) {
       try {
-        // Show loading
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -377,26 +450,23 @@ class DeckSettingsBottomSheet extends StatelessWidget {
             child: CircularProgressIndicator(color: Colors.white),
           ),
         );
-
         await _firebaseService.deleteDeck(deck.id);
-
         if (context.mounted) {
-          Navigator.pop(context); // Close loading
-          Navigator.pop(context); // Close bottom sheet
-
+          Navigator.pop(context);
+          Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Deck deleted successfully'),
+              content: Text('Deck deleted'),
               backgroundColor: Colors.green,
             ),
           );
         }
       } catch (e) {
         if (context.mounted) {
-          Navigator.pop(context); // Close loading
+          Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error deleting deck: $e'),
+              content: Text('Error: $e'),
               backgroundColor: Colors.red,
             ),
           );
@@ -419,18 +489,13 @@ class DeckSettingsBottomSheet extends StatelessWidget {
       child: SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
                   'Deck Settings',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -444,14 +509,9 @@ class DeckSettingsBottomSheet extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               deck.name,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
             ),
             const SizedBox(height: 24),
-
-            // Deck Info Card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -461,7 +521,7 @@ class DeckSettingsBottomSheet extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildInfoItem(
+                  _buildInfo(
                     Icons.book,
                     '${deck.totalWords}',
                     'Words',
@@ -472,7 +532,7 @@ class DeckSettingsBottomSheet extends StatelessWidget {
                     height: 40,
                     color: Colors.purple.shade200,
                   ),
-                  _buildInfoItem(
+                  _buildInfo(
                     Icons.trending_up,
                     '${deck.progress.toInt()}%',
                     'Progress',
@@ -483,7 +543,7 @@ class DeckSettingsBottomSheet extends StatelessWidget {
                     height: 40,
                     color: Colors.purple.shade200,
                   ),
-                  _buildInfoItem(
+                  _buildInfo(
                     Icons.check_circle,
                     '${deck.masteredWords}',
                     'Mastered',
@@ -492,35 +552,40 @@ class DeckSettingsBottomSheet extends StatelessWidget {
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // Export Option
-            _buildOptionTile(
-              icon: Icons.upload_file,
-              iconColor: Colors.blue,
-              iconBgColor: Colors.blue.shade50,
-              title: 'Export to Anki',
-              subtitle: 'Export as .apkg file',
-              onTap: () {
+            _buildOption(
+              Icons.upload_file,
+              Colors.blue,
+              Colors.blue.shade50,
+              'Export to Anki',
+              'Share as .apkg file',
+                  () {
                 Navigator.pop(context);
                 _exportDeck(context);
               },
             ),
-
             const SizedBox(height: 12),
-
-            // Delete Option
-            _buildOptionTile(
-              icon: Icons.delete_forever,
-              iconColor: Colors.red,
-              iconBgColor: Colors.red.shade50,
-              title: 'Delete Deck',
-              subtitle: 'This action cannot be undone',
-              titleColor: Colors.red,
-              onTap: () => _deleteDeck(context),
+            _buildOption(
+              Icons.download,
+              Colors.green,
+              Colors.green.shade50,
+              'Export to Device',
+              'Save .apkg to Downloads folder',
+                  () {
+                Navigator.pop(context);
+                _exportToDevice(context);
+              },
             ),
-
+            const SizedBox(height: 12),
+            _buildOption(
+              Icons.delete_forever,
+              Colors.red,
+              Colors.red.shade50,
+              'Delete Deck',
+              'This action cannot be undone',
+                  () => _deleteDeck(context),
+              titleColor: Colors.red,
+            ),
             const SizedBox(height: 8),
           ],
         ),
@@ -528,12 +593,7 @@ class DeckSettingsBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoItem(
-      IconData icon,
-      String value,
-      String label,
-      Color color,
-      ) {
+  Widget _buildInfo(IconData icon, String value, String label, Color color) {
     return Column(
       children: [
         Icon(icon, color: color, size: 24),
@@ -548,24 +608,21 @@ class DeckSettingsBottomSheet extends StatelessWidget {
         ),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         ),
       ],
     );
   }
 
-  Widget _buildOptionTile({
-    required IconData icon,
-    required Color iconColor,
-    required Color iconBgColor,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    Color? titleColor,
-  }) {
+  Widget _buildOption(
+      IconData icon,
+      Color iconColor,
+      Color bgColor,
+      String title,
+      String subtitle,
+      VoidCallback onTap, {
+        Color? titleColor,
+      }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -580,7 +637,7 @@ class DeckSettingsBottomSheet extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: iconBgColor,
+                color: bgColor,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: iconColor, size: 24),
@@ -609,11 +666,7 @@ class DeckSettingsBottomSheet extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
           ],
         ),
       ),
