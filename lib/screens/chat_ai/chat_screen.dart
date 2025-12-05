@@ -5,8 +5,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:vocab_ai/models/chat_message.dart';
 import 'package:vocab_ai/models/vocab_model.dart';
 import 'package:vocab_ai/screens/chat_ai/service/chat_service.dart';
-import 'package:vocab_ai/widgets/vocab_result_card.dart';
 
+// Import các Widgets đã tách
+import 'widgets/chat_bubble.dart';
+import 'widgets/chat_input_area.dart';
+import 'widgets/image_source_sheet.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -63,126 +66,13 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _showImageSourceDialog() async {
+  void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (BuildContext context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  "Choose Image Source",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildImageSourceOption(
-                        icon: Icons.camera_alt_rounded,
-                        label: "Camera",
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF6F47EB), Color(0xFF8B5CF6)],
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _pickImage(ImageSource.camera);
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildImageSourceOption(
-                        icon: Icons.photo_library_rounded,
-                        label: "Gallery",
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _pickImage(ImageSource.gallery);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildImageSourceOption({
-    required IconData icon,
-    required String label,
-    required Gradient gradient,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          gradient: gradient,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: gradient.colors.first.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: Colors.white, size: 32),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+      builder: (context) => ImageSourceSheet(
+        onCameraTap: () => _pickImage(ImageSource.camera),
+        onGalleryTap: () => _pickImage(ImageSource.gallery),
       ),
     );
   }
@@ -201,6 +91,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // ... (Giữ nguyên logic _startTypingTimer, _handleSend, _handleImageAnalysis,
+  //      _handleVocabQuery, _streamTextResponse từ code cũ của bạn) ...
+
+  // Mình paste lại các hàm logic này để đảm bảo file chạy được ngay:
   void _startTypingTimer(int messageIndex) {
     _typingTimer?.cancel();
     _typingTimer = Timer.periodic(const Duration(milliseconds: 20), (timer) {
@@ -212,7 +106,6 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           final char = _textBuffer[0];
           _textBuffer = _textBuffer.substring(1);
-
           final oldMsg = _messages[messageIndex];
           _messages[messageIndex] = ChatMessage(
             text: oldMsg.text + char,
@@ -259,11 +152,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _handleImageAnalysis(File image, String prompt) async {
     final botIndex = _messages.length;
-    _messages.add(ChatMessage(
-      isUser: false,
-      timestamp: DateTime.now(),
-      text: "🔍 Analyzing image...",
-    ));
+    _messages.add(ChatMessage(isUser: false, timestamp: DateTime.now(), text: "🔍 Analyzing image..."));
 
     try {
       final result = await _chatService.analyzeImage(image, prompt);
@@ -280,13 +169,13 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         });
       } else {
-        throw Exception("Could not analyze the image");
+        throw Exception("Could not analyze");
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
         _messages[botIndex] = ChatMessage(
-          text: "❌ Sorry, I couldn't analyze this image. Please try again with a clearer photo.",
+          text: "❌ Sorry, I couldn't analyze this image.",
           isUser: false,
           timestamp: DateTime.now(),
         );
@@ -297,11 +186,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _handleVocabQuery(String query) async {
     final botIndex = _messages.length;
-    _messages.add(ChatMessage(
-      isUser: false,
-      timestamp: DateTime.now(),
-      text: "📖 Analyzing vocabulary...",
-    ));
+    _messages.add(ChatMessage(isUser: false, timestamp: DateTime.now(), text: "📖 Analyzing vocabulary..."));
 
     try {
       final result = await _chatService.analyzeVocabulary(query);
@@ -317,13 +202,13 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         });
       } else {
-        throw Exception("Could not analyze vocabulary");
+        throw Exception("Could not analyze");
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
         _messages[botIndex] = ChatMessage(
-          text: "❌ Sorry, I couldn't analyze that word. Please rephrase your question.",
+          text: "❌ Sorry, I couldn't analyze that word.",
           isUser: false,
           timestamp: DateTime.now(),
         );
@@ -347,7 +232,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _textBuffer = '';
       setState(() {
         _messages[botIndex] = ChatMessage(
-          text: "❌ Error: Unable to get response. Please try again.",
+          text: "❌ Error: Unable to get response.",
           isUser: false,
           timestamp: DateTime.now(),
         );
@@ -364,7 +249,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             const Icon(Icons.check_circle, color: Colors.white),
             const SizedBox(width: 8),
-            Expanded(child: Text("✅ '${result.word}' added to your vocabulary deck!")),
+            Expanded(child: Text("✅ '${result.word}' added to deck!")),
           ],
         ),
         backgroundColor: Colors.green,
@@ -406,14 +291,12 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
             icon: const Icon(Icons.info_outline, color: Colors.black87),
             onPressed: () {
+              // Dialog hướng dẫn đơn giản, để ở đây cũng được hoặc tách file nếu muốn
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
                   title: const Row(children: [Icon(Icons.help_outline, color: Color(0xFF6F47EB)), SizedBox(width: 8), Text("How to use")]),
-                  content: const Text(
-                    "📸 Send photos to identify objects\n\n💬 Ask about any English word:\n• 'What is serendipity?'\n• 'Hợp tác là gì?'\n\n💡 Chat normally\n\n👆 Long press examples to copy",
-                    style: TextStyle(height: 1.5),
-                  ),
+                  content: const Text("📸 Send photos\n💬 Ask about words\n💡 Chat normally"),
                   actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Got it!"))],
                 ),
               );
@@ -428,225 +311,23 @@ class _ChatScreenState extends State<ChatScreen> {
               controller: _scroll,
               itemCount: _messages.length,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemBuilder: (_, i) => _buildBubble(_messages[i]),
-            ),
-          ),
-          _buildInputArea(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBubble(ChatMessage m) {
-    // SỬA LỖI TRÀN: Sử dụng Flexible cho cả Card và Text Bubble
-
-    // CASE 1: Hiển thị Vocab Card
-    if (m.vocabResult != null) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildBotAvatar(),
-          const SizedBox(width: 8),
-          // SỬA: Bọc VocabResultCard bằng Flexible để nó không đẩy Row ra ngoài màn hình
-          Flexible(
-            child: VocabResultCard(
-              result: m.vocabResult!,
-              image: m.image,
-              onAddToVocab: () => _handleAddToVocab(m.vocabResult!),
-            ),
-          ),
-        ],
-      );
-    }
-
-    // CASE 2: Hiển thị tin nhắn thông thường
-    final isUser = m.isUser;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!isUser) _buildBotAvatar(),
-          if (!isUser) const SizedBox(width: 8),
-
-          // SỬA: Bọc Column bằng Flexible để bubble chat không bị tràn
-          Flexible(
-            child: Column(
-              crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [
-                if (m.image != null && m.vocabResult == null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 200, maxHeight: 200),
-                        child: Image.file(m.image!, fit: BoxFit.cover),
-                      ),
-                    ),
-                  ),
-
-                if (m.text.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: isUser
-                          ? const LinearGradient(colors: [Color(0xFF6F47EB), Color(0xFF8B5CF6)])
-                          : null,
-                      color: isUser ? null : Colors.white,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
-                        bottomLeft: Radius.circular(isUser ? 16 : 4),
-                        bottomRight: Radius.circular(isUser ? 4 : 16),
-                      ),
-                      border: isUser ? null : Border.all(color: Colors.grey.shade200),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isUser
-                              ? const Color(0xFF6F47EB).withOpacity(0.3)
-                              : Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        )
-                      ],
-                    ),
-                    child: Text(
-                      m.text,
-                      style: TextStyle(color: isUser ? Colors.white : Colors.black87, fontSize: 15, height: 1.5),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBotAvatar() {
-    return Container(
-      margin: const EdgeInsets.only(top: 4),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF6F47EB).withOpacity(0.1),
-            const Color(0xFF8B5CF6).withOpacity(0.1),
-          ],
-        ),
-        shape: BoxShape.circle,
-      ),
-      child: const Icon(Icons.smart_toy_outlined, color: Color(0xFF6F47EB), size: 18),
-    );
-  }
-
-  Widget _buildInputArea() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade100)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, -5))
-        ],
-      ),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_pendingImage != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(_pendingImage!, width: 80, height: 80, fit: BoxFit.cover),
-                    ),
-                    Positioned(
-                      top: -4,
-                      right: -4,
-                      child: IconButton(
-                        onPressed: () => setState(() => _pendingImage = null),
-                        icon: const CircleAvatar(
-                          radius: 12,
-                          backgroundColor: Colors.black87,
-                          child: Icon(Icons.close, size: 14, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              itemBuilder: (_, i) => ChatBubble(
+                message: _messages[i],
+                onAddToVocab: () => _messages[i].vocabResult != null
+                    ? _handleAddToVocab(_messages[i].vocabResult!)
+                    : null,
               ),
-
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _controller,
-                            decoration: const InputDecoration(
-                              hintText: "Ask anything...",
-                              border: InputBorder.none,
-                              hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
-                            ),
-                            onSubmitted: (_) => _handleSend(),
-                            maxLines: null,
-                            textCapitalization: TextCapitalization.sentences,
-                          ),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.camera_alt_outlined, color: Colors.grey.shade600),
-                          onPressed: _isLoading ? null : _showImageSourceDialog,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: _isLoading ? null : _handleSend,
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: _isLoading
-                          ? null
-                          : const LinearGradient(colors: [Color(0xFF6F47EB), Color(0xFF8B5CF6)]),
-                      color: _isLoading ? Colors.grey.shade300 : null,
-                      shape: BoxShape.circle,
-                      boxShadow: _isLoading
-                          ? null
-                          : [
-                        BoxShadow(
-                          color: const Color(0xFF6F47EB).withOpacity(0.4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        )
-                      ],
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-                  ),
-                ),
-              ],
             ),
-          ],
-        ),
+          ),
+          ChatInputArea(
+            controller: _controller,
+            isLoading: _isLoading,
+            pendingImage: _pendingImage,
+            onSend: _handleSend,
+            onCameraTap: _showImageSourceDialog,
+            onRemoveImage: () => setState(() => _pendingImage = null),
+          ),
+        ],
       ),
     );
   }
