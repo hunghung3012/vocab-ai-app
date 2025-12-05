@@ -2,9 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
 import 'package:vocab_ai/main_screen.dart';
 import 'package:vocab_ai/services/local_notification/local_notification_service.dart';
-import 'package:vocab_ai/screens/authentication/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/docks/create_deck/create_deck_screen.dart';
@@ -17,28 +17,31 @@ import 'models/deck.dart';
 import 'firebase_options.dart';
 import 'screens/docks/decks_screen.dart';
 
+// ✅ THÊM: Import providers
+import 'providers/theme_provider.dart';
+import 'providers/notification_provider.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await FirebaseAuth.instance.signInAnonymously();
 
-  // ✅ THÊM: Initialize notification service
-  await _initializeNotifications();
+  // ✅ Initialize notification service
+  await LocalNotificationService().initialize();
 
-  runApp(const VocabAIApp());
-}
-
-// ✅ THÊM: Function để initialize notifications
-Future<void> _initializeNotifications() async {
-  final notificationService = LocalNotificationService();
-  await notificationService.initialize();
-
-  // Schedule daily reminder at 8 AM
-  await notificationService.scheduleDailyVocabReminder();
-
-  // 🧪 TESTING: Uncomment để test notification mỗi 20 giây
-  // await notificationService.startRepeatingNotificationEvery20Seconds();
+  runApp(
+    // ✅ Wrap với MultiProvider
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
+      ],
+      child: const VocabAIApp(),
+    ),
+  );
 }
 
 class VocabAIApp extends StatelessWidget {
@@ -46,96 +49,97 @@ class VocabAIApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'VocabAI',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.purple,
-        scaffoldBackgroundColor: Colors.grey[50],
-        fontFamily: 'Inter',
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.purple,
-          brightness: Brightness.light,
-        ),
-      ),
-      initialRoute: '/',
-      home: LoginScreen(),
-      onGenerateRoute: (settings) {
-        switch (settings.name) {
-          case '/':
-            return MaterialPageRoute(
-              builder: (_) => const MainScreen(initialIndex: 0),
-            );
-          case '/dashboard':
-            return MaterialPageRoute(
-              builder: (_) => const MainScreen(initialIndex: 1),
-            );
-          case '/decks':
-            return MaterialPageRoute(
-              builder: (_) => const MainScreen(initialIndex: 2),
-            );
-          case '/quiz':
-            final deck = settings.arguments as Deck?;
-            if (deck != null) {
-              return MaterialPageRoute(builder: (_) => QuizScreen(deck: deck));
+    // ✅ Listen to theme changes
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: 'VocabAI',
+          debugShowCheckedModeBanner: false,
+          // ✅ Dynamic theme based on ThemeProvider
+          theme: ThemeData(
+            primarySwatch: Colors.purple,
+            scaffoldBackgroundColor: Colors.grey[50],
+            fontFamily: 'Inter',
+            useMaterial3: true,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.purple,
+              brightness: Brightness.light,
+            ),
+            cardColor: Colors.white,
+          ),
+          // ✅ Dark theme
+          darkTheme: ThemeData(
+            primarySwatch: Colors.purple,
+            scaffoldBackgroundColor: const Color(0xFF121212),
+            fontFamily: 'Inter',
+            useMaterial3: true,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.purple,
+              brightness: Brightness.dark,
+            ),
+            cardColor: const Color(0xFF1E1E1E),
+          ),
+          // ✅ Theme mode từ provider
+          themeMode: themeProvider.themeMode,
+          initialRoute: '/',
+          onGenerateRoute: (settings) {
+            switch (settings.name) {
+              case '/':
+                return MaterialPageRoute(
+                  builder: (_) => const MainScreen(initialIndex: 0),
+                );
+              case '/dashboard':
+                return MaterialPageRoute(
+                  builder: (_) => const MainScreen(initialIndex: 1),
+                );
+              case '/decks':
+                return MaterialPageRoute(
+                  builder: (_) => const MainScreen(initialIndex: 2),
+                );
+              case '/quiz':
+                final deck = settings.arguments as Deck?;
+                if (deck != null) {
+                  return MaterialPageRoute(
+                    builder: (_) => QuizScreen(deck: deck),
+                  );
+                }
+                return MaterialPageRoute(
+                  builder: (_) => const MainScreen(initialIndex: 3),
+                );
+              case '/chat':
+                return MaterialPageRoute(
+                  builder: (_) => const MainScreen(initialIndex: 4),
+                );
+              case '/create-deck':
+                return MaterialPageRoute(
+                  builder: (_) => const CreateDeckScreen(),
+                );
+              case '/study':
+                final deck = settings.arguments as Deck;
+                return MaterialPageRoute(
+                  builder: (_) => StudyScreen(deck: deck),
+                );
+              case '/edit-deck':
+                final deck = settings.arguments as Deck;
+                return MaterialPageRoute(
+                  builder: (_) => EditDeckScreen(deck: deck),
+                );
+              case '/import-anki':
+                return MaterialPageRoute(
+                  builder: (_) => const ImportAnkiScreen(),
+                );
+              case '/quiz-with-deck':
+                final deck = settings.arguments as Deck;
+                return MaterialPageRoute(
+                  builder: (_) => QuizScreen(deck: deck),
+                );
+              default:
+                return MaterialPageRoute(
+                  builder: (_) => const MainScreen(initialIndex: 0),
+                );
             }
-            return MaterialPageRoute(
-              builder: (_) => const MainScreen(initialIndex: 3),
-            );
-          case '/chat':
-            return MaterialPageRoute(
-              builder: (_) => const MainScreen(initialIndex: 4),
-            );
-          case '/create-deck':
-            return MaterialPageRoute(
-              builder: (_) => const MainScreen(initialIndex: 0),
-            );
-
-          case '/dashboard':
-            return MaterialPageRoute(
-              builder: (_) => const MainScreen(initialIndex: 1),
-            );
-
-          case '/decks':
-            return MaterialPageRoute(
-              builder: (_) => const MainScreen(initialIndex: 2),
-            );
-
-          case '/quiz':
-            final deck = settings.arguments as Deck?;
-            if (deck != null) {
-              return MaterialPageRoute(builder: (_) => QuizScreen(deck: deck));
-            }
-            return MaterialPageRoute(
-              builder: (_) => const MainScreen(initialIndex: 3), // ✔ Quiz tab
-            );
-
-          case '/chat':
-            return MaterialPageRoute(
-              builder: (_) => const MainScreen(initialIndex: 4), // ✔ Chat tab
-            );
-
-          case '/create-deck':
-            return MaterialPageRoute(builder: (_) => const CreateDeckScreen());
-          case '/study':
-            final deck = settings.arguments as Deck;
-            return MaterialPageRoute(builder: (_) => StudyScreen(deck: deck));
-          case '/edit-deck':
-            final deck = settings.arguments as Deck;
-            return MaterialPageRoute(
-              builder: (_) => EditDeckScreen(deck: deck),
-            );
-          case '/import-anki':
-            return MaterialPageRoute(builder: (_) => const ImportAnkiScreen());
-          case '/quiz-with-deck':
-            final deck = settings.arguments as Deck;
-            return MaterialPageRoute(builder: (_) => QuizScreen(deck: deck));
-          default:
-            return MaterialPageRoute(
-              builder: (_) => const MainScreen(initialIndex: 0),
-            );
-        }
+          },
+        );
       },
     );
   }

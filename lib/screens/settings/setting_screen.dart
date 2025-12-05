@@ -1,7 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:vocab_ai/screens/authentication/login_screen.dart';
 import 'package:vocab_ai/screens/authentication/service/auth_service.dart';
+import 'package:vocab_ai/screens/settings/appearance_settings/appearance_settings_screen.dart';
+import 'package:vocab_ai/screens/settings/notifications_settings/notifications_settings_screen.dart';
+
+import '../../providers/notification_provider.dart';
+import '../../providers/theme_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -9,10 +15,10 @@ class SettingsScreen extends StatelessWidget {
   AuthService get auth => AuthService();
 
   void _showSnack(
-    BuildContext context,
-    String msg, {
-    Color color = Colors.black,
-  }) {
+      BuildContext context,
+      String msg, {
+        Color color = Colors.black,
+      }) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
@@ -39,7 +45,6 @@ class SettingsScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -63,9 +68,12 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _buildSettingsList(BuildContext context, User? user) {
+    final notificationProvider = Provider.of<NotificationProvider>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
@@ -79,6 +87,7 @@ class SettingsScreen extends StatelessWidget {
       child: Column(
         children: [
           _buildSettingsItem(
+            context,
             icon: Icons.person,
             title: 'Account',
             subtitle: user?.email ?? 'Anonymous',
@@ -86,24 +95,68 @@ class SettingsScreen extends StatelessWidget {
             onTap: () {},
           ),
           _buildSettingsItem(
+            context,
             icon: Icons.notifications_none,
             title: 'Notifications',
-            subtitle: 'Manage notification preferences',
-            onTap: () {},
+            subtitle: notificationProvider.isEnabled
+                ? 'Enabled (every 20s)'
+                : 'Disabled',
+            trailing: notificationProvider.isEnabled
+                ? Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'ON',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            )
+                : null,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const NotificationsSettingsScreen(),
+                ),
+              );
+            },
           ),
           _buildSettingsItem(
+            context,
             icon: Icons.language,
             title: 'Language',
             subtitle: 'English',
             onTap: () {},
           ),
           _buildSettingsItem(
+            context,
             icon: Icons.light_mode_outlined,
             title: 'Appearance',
-            subtitle: 'Light mode',
-            onTap: () {},
+            subtitle: themeProvider.isLightMode
+                ? 'Light mode'
+                : themeProvider.isDarkMode
+                ? 'Dark mode'
+                : 'System default',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AppearanceSettingsScreen(),
+                ),
+              );
+            },
           ),
           _buildSettingsItem(
+            context,
             icon: Icons.help_outline,
             title: 'Help & Support',
             subtitle: 'Get help and contact us',
@@ -115,14 +168,16 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingsItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    bool isFirst = false,
-    bool isLast = false,
-  }) {
+  Widget _buildSettingsItem(
+      BuildContext context, {
+        required IconData icon,
+        required String title,
+        required String subtitle,
+        required VoidCallback onTap,
+        Widget? trailing,
+        bool isFirst = false,
+        bool isLast = false,
+      }) {
     return Column(
       children: [
         if (!isFirst)
@@ -146,22 +201,23 @@ class SettingsScreen extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.w500),
           ),
           subtitle: Text(subtitle, style: const TextStyle(color: Colors.grey)),
-          trailing: const Icon(
-            Icons.arrow_forward_ios,
-            size: 16,
-            color: Colors.grey,
-          ),
+          trailing: trailing ??
+              const Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Colors.grey,
+              ),
           onTap: onTap,
           shape: isFirst
               ? const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
-                )
+            borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+          )
               : isLast
               ? const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(
-                    bottom: Radius.circular(15),
-                  ),
-                )
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.circular(15),
+            ),
+          )
               : null,
         ),
       ],
@@ -171,7 +227,7 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildLogoutButton(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
@@ -218,7 +274,7 @@ class SettingsScreen extends StatelessWidget {
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (_) => const LoginScreen()),
-              (route) => false,
+                  (route) => false,
             );
           } else {
             _showSnack(context, "Logout failed", color: Colors.red);
