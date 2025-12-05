@@ -5,7 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:vocab_ai/main_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
-import 'screens/docks/create_deck_screen.dart';
+import 'screens/docks/create_deck/create_deck_screen.dart';
 import 'screens/docks/study_screen.dart';
 import 'screens/docks/edit_deck_screen.dart';
 import 'screens/chat_ai/chat_screen.dart';
