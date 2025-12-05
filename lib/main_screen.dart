@@ -4,15 +4,13 @@ import 'package:vocab_ai/screens/dashboard/dashboard_screen.dart';
 import 'package:vocab_ai/screens/docks/decks_screen.dart';
 import 'package:vocab_ai/screens/home/home_screen.dart';
 import 'package:vocab_ai/screens/quiz/quiz_screen.dart';
+import 'package:vocab_ai/screens/settings/setting_screen.dart';
 import '../widgets/app_bottom_nav.dart';
 
 class MainScreen extends StatefulWidget {
   final int initialIndex;
 
-  const MainScreen({
-    Key? key,
-    this.initialIndex = 0,
-  }) : super(key: key);
+  const MainScreen({Key? key, this.initialIndex = 0}) : super(key: key);
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -28,7 +26,6 @@ class _MainScreenState extends State<MainScreen> {
     const DecksScreen(),
     const QuizScreen(deck: null), // Quiz list - không có deck cụ thể
     const ChatScreen(),
-
   ];
 
   @override
@@ -74,7 +71,10 @@ class _MainScreenState extends State<MainScreen> {
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.black54),
             onPressed: () {
-              // TODO: Navigate to settings
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => SettingsScreen()),
+              );
             },
           ),
         ],
@@ -82,10 +82,7 @@ class _MainScreenState extends State<MainScreen> {
 
       // 🔥 Body - Chuyển đổi giữa các trang
       // IndexedStack giữ state của mỗi trang khi chuyển tab
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _pages),
 
       // 🔥 BottomNavigationBar cố định
       bottomNavigationBar: AppBottomNav(
