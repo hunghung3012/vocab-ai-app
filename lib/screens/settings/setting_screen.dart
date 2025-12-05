@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:vocab_ai/screens/authentication/login_screen.dart';
 import 'package:vocab_ai/screens/authentication/service/auth_service.dart';
 import 'package:vocab_ai/screens/settings/appearance_settings/appearance_settings_screen.dart';
+import 'package:vocab_ai/screens/settings/help_support/help_support_screen.dart';
 import 'package:vocab_ai/screens/settings/notifications_settings/notifications_settings_screen.dart';
 
 import '../../providers/notification_provider.dart';
@@ -161,7 +162,15 @@ class SettingsScreen extends StatelessWidget {
             title: 'Help & Support',
             subtitle: 'Get help and contact us',
             isLast: true,
-            onTap: () {},
+            onTap: () {
+              // ✅ THAY ĐỔI: Navigate đến Help screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HelpSupportScreen(),
+                ),
+              );
+            },
           ),
         ],
       ),
