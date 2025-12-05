@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:vocab_ai/main_screen.dart';
+import 'package:vocab_ai/screens/authentication/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/docks/create_deck_screen.dart';
@@ -18,9 +19,7 @@ import 'screens/docks/decks_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirebaseAuth.instance.signInAnonymously();
   runApp(const VocabAIApp());
 }
@@ -44,61 +43,54 @@ class VocabAIApp extends StatelessWidget {
         ),
       ),
       initialRoute: '/',
+      home: LoginScreen(),
       onGenerateRoute: (settings) {
         switch (settings.name) {
-        // 🔥 MAIN TABS - Sử dụng MainScreen
-        case '/':
-        return MaterialPageRoute(
-        builder: (_) => const MainScreen(initialIndex: 0),
-        );
-
-        case '/dashboard':
-        return MaterialPageRoute(
-        builder: (_) => const MainScreen(initialIndex: 1),
-        );
-
-        case '/decks':
-        return MaterialPageRoute(
-        builder: (_) => const MainScreen(initialIndex: 2),
-        );
-
-        case '/quiz':
-        final deck = settings.arguments as Deck?;
-        if (deck != null) {
-        return MaterialPageRoute(builder: (_) => QuizScreen(deck: deck));
-        }
-        return MaterialPageRoute(
-        builder: (_) => const MainScreen(initialIndex: 3),  // ✔ Quiz tab
-        );
-
-        case '/chat':
-        return MaterialPageRoute(
-        builder: (_) => const MainScreen(initialIndex: 4),  // ✔ Chat tab
-        );
-
-        case '/create-deck':
+          // 🔥 MAIN TABS - Sử dụng MainScreen
+          case '/':
             return MaterialPageRoute(
-              builder: (_) => const CreateDeckScreen(),
+              builder: (_) => const MainScreen(initialIndex: 0),
             );
+
+          case '/dashboard':
+            return MaterialPageRoute(
+              builder: (_) => const MainScreen(initialIndex: 1),
+            );
+
+          case '/decks':
+            return MaterialPageRoute(
+              builder: (_) => const MainScreen(initialIndex: 2),
+            );
+
+          case '/quiz':
+            final deck = settings.arguments as Deck?;
+            if (deck != null) {
+              return MaterialPageRoute(builder: (_) => QuizScreen(deck: deck));
+            }
+            return MaterialPageRoute(
+              builder: (_) => const MainScreen(initialIndex: 3), // ✔ Quiz tab
+            );
+
+          case '/chat':
+            return MaterialPageRoute(
+              builder: (_) => const MainScreen(initialIndex: 4), // ✔ Chat tab
+            );
+
+          case '/create-deck':
+            return MaterialPageRoute(builder: (_) => const CreateDeckScreen());
           case '/study':
             final deck = settings.arguments as Deck;
-            return MaterialPageRoute(
-              builder: (_) => StudyScreen(deck: deck),
-            );
+            return MaterialPageRoute(builder: (_) => StudyScreen(deck: deck));
           case '/edit-deck':
             final deck = settings.arguments as Deck;
             return MaterialPageRoute(
               builder: (_) => EditDeckScreen(deck: deck),
             );
           case '/import-anki':
-            return MaterialPageRoute(
-              builder: (_) => const ImportAnkiScreen(),
-            );
+            return MaterialPageRoute(builder: (_) => const ImportAnkiScreen());
           case '/quiz-with-deck':
             final deck = settings.arguments as Deck;
-            return MaterialPageRoute(
-              builder: (_) => QuizScreen(deck: deck),
-            );
+            return MaterialPageRoute(builder: (_) => QuizScreen(deck: deck));
           default:
             return MaterialPageRoute(
               builder: (_) => const MainScreen(initialIndex: 0),
