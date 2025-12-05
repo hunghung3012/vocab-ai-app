@@ -13,8 +13,10 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final emailCtrl = TextEditingController();
-  final passwordCtrl = TextEditingController();
+  // --- SỬA Ở ĐÂY: Thêm text mặc định để test ---
+  final emailCtrl = TextEditingController(text: "english@gmail.com");
+  final passwordCtrl = TextEditingController(text: "123456");
+  // --------------------------------------------
 
   bool obscure = true;
   bool remember = false;
@@ -148,44 +150,44 @@ class _LoginScreenState extends State<LoginScreen> {
                       onTap: isLoading
                           ? null
                           : () async {
-                              if (!_formKey.currentState!.validate()) return;
+                        if (!_formKey.currentState!.validate()) return;
 
-                              setState(() => isLoading = true);
+                        setState(() => isLoading = true);
 
-                              _showSnack("Logging in...", color: Colors.blue);
+                        _showSnack("Logging in...", color: Colors.blue);
 
-                              try {
-                                final isLoginSuccess = await authService.signIn(
-                                  emailCtrl.text.trim(),
-                                  passwordCtrl.text.trim(),
-                                );
+                        try {
+                          final isLoginSuccess = await authService.signIn(
+                            emailCtrl.text.trim(),
+                            passwordCtrl.text.trim(),
+                          );
 
-                                if (isLoginSuccess) {
-                                  _showSnack(
-                                    "Login Success",
-                                    color: Colors.green,
-                                  );
+                          if (isLoginSuccess) {
+                            _showSnack(
+                              "Login Success",
+                              color: Colors.green,
+                            );
 
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const MainScreen(),
-                                    ),
-                                  );
-                                } else {
-                                  _showSnack("Login FAILED", color: Colors.red);
-                                }
-                              } catch (e) {
-                                _showSnack(
-                                  "Error: $e",
-                                  color: Colors.redAccent,
-                                );
-                              } finally {
-                                if (mounted) {
-                                  setState(() => isLoading = false);
-                                }
-                              }
-                            },
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const MainScreen(),
+                              ),
+                            );
+                          } else {
+                            _showSnack("Login FAILED", color: Colors.red);
+                          }
+                        } catch (e) {
+                          _showSnack(
+                            "Error: $e",
+                            color: Colors.redAccent,
+                          );
+                        } finally {
+                          if (mounted) {
+                            setState(() => isLoading = false);
+                          }
+                        }
+                      },
                     ),
 
                     const SizedBox(height: 16),

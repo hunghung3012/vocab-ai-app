@@ -4,11 +4,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:vocab_ai/main_screen.dart';
+import 'package:vocab_ai/screens/authentication/login_screen.dart';
 import 'package:vocab_ai/services/local_notification/local_notification_service.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/docks/create_deck/create_deck_screen.dart';
-import 'screens/docks/study_screen.dart';
+import 'screens/docks/study/study_screen.dart';
 import 'screens/docks/edit_deck/edit_deck_screen.dart';
 import 'screens/chat_ai/chat_screen.dart';
 import 'screens/quiz/quiz_screen.dart';
@@ -49,6 +50,7 @@ class VocabAIApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final seed = const Color(0xFF53B175);
     // ✅ Listen to theme changes
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
@@ -56,32 +58,31 @@ class VocabAIApp extends StatelessWidget {
           title: 'VocabAI',
           debugShowCheckedModeBanner: false,
           // ✅ Dynamic theme based on ThemeProvider
-          theme: ThemeData(
-            primarySwatch: Colors.purple,
-            scaffoldBackgroundColor: Colors.grey[50],
-            fontFamily: 'Inter',
-            useMaterial3: true,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.purple,
-              brightness: Brightness.light,
-            ),
-            cardColor: Colors.white,
+
+
+        theme: ThemeData(
+          useMaterial3: true,
+          fontFamily: 'Inter',
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: seed,
+            brightness: Brightness.light,
           ),
-          // ✅ Dark theme
-          darkTheme: ThemeData(
-            primarySwatch: Colors.purple,
-            scaffoldBackgroundColor: const Color(0xFF121212),
-            fontFamily: 'Inter',
-            useMaterial3: true,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.purple,
-              brightness: Brightness.dark,
-            ),
-            cardColor: const Color(0xFF1E1E1E),
-          ),
-          // ✅ Theme mode từ provider
+        ),
+
+        darkTheme: ThemeData(
+        useMaterial3: true,
+        fontFamily: 'Inter',
+        colorScheme: ColorScheme.fromSeed(
+        seedColor: seed,   // ✔ sửa lại, không còn màu tím
+        brightness: Brightness.dark,
+        ),
+        ),
+
+        // ✅ Theme mode từ provider
           themeMode: themeProvider.themeMode,
           initialRoute: '/',
+          // qua trang login trước khi vào MainScreen
+          home: LoginScreen(),
           onGenerateRoute: (settings) {
             switch (settings.name) {
               case '/':

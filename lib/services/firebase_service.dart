@@ -1,3 +1,5 @@
+// lib/services/firebase_service.dart
+
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,7 +14,62 @@ class FirebaseService {
 
   String? get userId => _auth.currentUser?.uid;
 
+  // ===========================================================================
+  // HELPER: Thống kê Deck (Logic mới quan trọng)
+  // ===========================================================================
+
+  /// Tính toán lại stats của Deck dựa trên các flashcard hiện có
+  Future<void> updateDeckStats(String deckId) async {
+    try {
+      if (userId == null) throw Exception('User not logged in');
+
+      // 1. Lấy tất cả cards thuộc deck này
+      final cardsSnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('flashcards')
+          .where('deckId', isEqualTo: deckId)
+          .get();
+
+      final totalWords = cardsSnapshot.docs.length;
+
+      // 2. Đếm số từ đã "thuộc" (Mastered)
+      // Điều kiện: easeFactor >= 2.5 và đã học ít nhất 4 lần
+      final masteredWords = cardsSnapshot.docs.where((doc) {
+        final data = doc.data();
+        final easeFactor = data['easeFactor'] ?? 2.5;
+        final repetitions = data['repetitions'] ?? 0;
+        return easeFactor >= 2.5 && repetitions >= 4;
+      }).length;
+
+      // 3. Tính phần trăm
+      final progress = totalWords > 0
+          ? (masteredWords / totalWords * 100).toDouble()
+          : 0.0;
+
+      // 4. Cập nhật vào Deck document
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('decks')
+          .doc(deckId)
+          .update({
+        'totalWords': totalWords,
+        'masteredWords': masteredWords,
+        'progress': progress,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('✅ Deck stats updated: $totalWords words, $masteredWords mastered');
+    } catch (e) {
+      print('Error updating deck stats: $e');
+      // Không throw lỗi ở đây để tránh crash luồng chính nếu chỉ lỗi update stats
+    }
+  }
+
+  // ===========================================================================
   // DECK OPERATIONS
+  // ===========================================================================
 
   Future<void> createDeck(Deck deck) async {
     if (userId == null) throw Exception('User not authenticated');
@@ -39,17 +96,32 @@ class FirebaseService {
   Future<void> deleteDeck(String deckId) async {
     if (userId == null) throw Exception('User not authenticated');
 
-    final flashcards = await getFlashcardsByDeck(deckId);
-    for (var card in flashcards) {
-      await deleteFlashcard(card.id);
+    // Lấy danh sách card để xóa
+    // Lưu ý: Ta dùng query trực tiếp thay vì getFlashcardsByDeck để tối ưu cho việc xóa
+    final cardsSnapshot = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('flashcards')
+        .where('deckId', isEqualTo: deckId)
+        .get();
+
+    final batch = _firestore.batch();
+
+    // Thêm lệnh xóa từng card vào batch
+    for (var doc in cardsSnapshot.docs) {
+      batch.delete(doc.reference);
     }
 
-    await _firestore
+    // Thêm lệnh xóa deck vào batch
+    final deckRef = _firestore
         .collection('users')
         .doc(userId)
         .collection('decks')
-        .doc(deckId)
-        .delete();
+        .doc(deckId);
+    batch.delete(deckRef);
+
+    // Thực thi batch (Atomic operation - an toàn hơn vòng lặp)
+    await batch.commit();
   }
 
   Stream<List<Deck>> getDecksStream() {
@@ -80,74 +152,134 @@ class FirebaseService {
     return Deck.fromMap(doc.data()!);
   }
 
-  // FLASHCARD OPERATIONS
+  // ===========================================================================
+  // FLASHCARD OPERATIONS (Updated logic)
+  // ===========================================================================
 
+  // 1. Tạo Flashcard -> Lưu deckId vào card -> Cập nhật Stats
   Future<void> createFlashcard(Flashcard card, String deckId) async {
-    if (userId == null) throw Exception('User not authenticated');
+    try {
+      if (userId == null) throw Exception('User not authenticated');
 
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('flashcards')
-        .doc(card.id)
-        .set(card.toMap());
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('flashcards')
+          .doc(card.id)
+          .set({
+        ...card.toMap(),
+        'deckId': deckId, // Quan trọng: Liên kết card với deck
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-    final deck = await getDeck(deckId);
-    if (deck != null) {
-      final updatedIds = [...deck.flashcardIds, card.id];
-      await updateDeck(deck.copyWith(
-        flashcardIds: updatedIds,
-        totalWords: updatedIds.length,
-      ));
+      // Cập nhật stats cho deck
+      await updateDeckStats(deckId);
+    } catch (e) {
+      print('Error creating flashcard: $e');
+      rethrow;
     }
   }
 
+  // 2. Cập nhật Flashcard -> Cập nhật Stats (vì có thể trạng thái mastered thay đổi)
   Future<void> updateFlashcard(Flashcard card) async {
-    if (userId == null) throw Exception('User not authenticated');
+    try {
+      if (userId == null) throw Exception('User not authenticated');
 
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('flashcards')
-        .doc(card.id)
-        .update(card.toMap());
+      // Lấy deckId hiện tại của card (để biết cần update deck nào)
+      final cardDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('flashcards')
+          .doc(card.id)
+          .get();
+
+      final deckId = cardDoc.data()?['deckId'];
+
+      // Cập nhật thông tin card
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('flashcards')
+          .doc(card.id)
+          .update({
+        ...card.toMap(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Cập nhật lại stats nếu tìm thấy deckId
+      if (deckId != null) {
+        await updateDeckStats(deckId);
+      }
+    } catch (e) {
+      print('Error updating flashcard: $e');
+      rethrow;
+    }
   }
 
+  // 3. Xóa Flashcard -> Cập nhật Stats
   Future<void> deleteFlashcard(String cardId) async {
-    if (userId == null) throw Exception('User not authenticated');
+    try {
+      if (userId == null) throw Exception('User not authenticated');
 
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('flashcards')
-        .doc(cardId)
-        .delete();
-  }
-
-  Future<List<Flashcard>> getFlashcardsByDeck(String deckId) async {
-    if (userId == null) return [];
-
-    final deck = await getDeck(deckId);
-    if (deck == null) return [];
-
-    final List<Flashcard> cards = [];
-    for (var cardId in deck.flashcardIds) {
-      final doc = await _firestore
+      // Lấy thông tin card trước khi xóa để lấy deckId
+      final cardDoc = await _firestore
           .collection('users')
           .doc(userId)
           .collection('flashcards')
           .doc(cardId)
           .get();
 
-      if (doc.exists) {
-        cards.add(Flashcard.fromMap(doc.data()!));
+      if (!cardDoc.exists) {
+        // Card không tồn tại hoặc đã bị xóa
+        return;
       }
-    }
 
-    return cards;
+      final deckId = cardDoc.data()?['deckId'];
+
+      // Xóa card
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('flashcards')
+          .doc(cardId)
+          .delete();
+
+      // Cập nhật lại stats
+      if (deckId != null) {
+        await updateDeckStats(deckId);
+      }
+    } catch (e) {
+      print('Error deleting flashcard: $e');
+      rethrow;
+    }
   }
 
-  // UPLOAD IMAGE TO CLOUDINARY
+  // Lấy Flashcards bằng Query (Hiệu quả hơn dùng mảng IDs)
+  Future<List<Flashcard>> getFlashcardsByDeck(String deckId) async {
+    if (userId == null) return [];
+
+    try {
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('flashcards')
+          .where('deckId', isEqualTo: deckId)
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => Flashcard.fromMap(doc.data()))
+          .toList();
+    } catch (e) {
+      print('Error getting flashcards: $e');
+      return [];
+    }
+  }
+
+  // ===========================================================================
+  // UPLOAD & STATISTICS
+  // ===========================================================================
+
   Future<String> uploadImage(File imageFile, String deckId) async {
     try {
       final imageUrl = await _cloudinaryService.uploadImage(imageFile);
@@ -156,8 +288,6 @@ class FirebaseService {
       throw Exception('Failed to upload image: $e');
     }
   }
-
-  // STATISTICS
 
   Future<Map<String, dynamic>> getUserStats() async {
     if (userId == null) return {};
@@ -211,17 +341,33 @@ class FirebaseService {
     }
 
     final data = doc.data()!;
-    final lastStudy = DateTime.parse(data['lastStudyDate']);
-    final difference = now.difference(lastStudy).inDays;
+    final lastStudyStr = data['lastStudyDate'] as String?;
+
+    if (lastStudyStr == null) return; // Guard clause
+
+    final lastStudy = DateTime.parse(lastStudyStr);
+
+    // Reset thời gian về đầu ngày để so sánh ngày chính xác
+    final dateNow = DateTime(now.year, now.month, now.day);
+    final dateLast = DateTime(lastStudy.year, lastStudy.month, lastStudy.day);
+
+    final difference = dateNow.difference(dateLast).inDays;
 
     if (difference == 1) {
+      // Học liên tiếp
       await streakRef.update({
         'days': (data['days'] ?? 0) + 1,
         'lastStudyDate': now.toIso8601String(),
       });
     } else if (difference > 1) {
+      // Bị ngắt quãng
       await streakRef.update({
         'days': 1,
+        'lastStudyDate': now.toIso8601String(),
+      });
+    } else {
+      // Vẫn trong cùng 1 ngày -> chỉ cập nhật lastStudyDate
+      await streakRef.update({
         'lastStudyDate': now.toIso8601String(),
       });
     }

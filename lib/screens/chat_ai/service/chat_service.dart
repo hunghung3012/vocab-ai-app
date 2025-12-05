@@ -36,10 +36,19 @@ class GeminiChatService {
       apiKey: apiKey,
       systemInstruction: Content.system(
           "You are an expert at identifying objects in images. "
-              "Return ONLY a valid JSON object:\n"
-              "{\"word\": \"object_name\", \"definition\": \"clear definition\", "
-              "\"type\": \"noun/verb/adjective\", "
-              "\"related\": [\"w1\", \"w2\", \"w3\"], \"confidence\": 0.95}"
+              "Analyze the image and return ONLY a valid JSON object:\n"
+              "{\n"
+              "  \"word\": \"English word for the object\",\n"
+              "  \"definition\": \"Vietnamese translation and explanation\",\n"
+              "  \"type\": \"noun/verb/adjective\",\n"
+              "  \"pronunciation\": \"/pronunciation/\",\n"
+              "  \"part_of_speech\": \"noun/verb/adjective/etc\",\n"
+              "  \"related\": [\"related_word1\", \"related_word2\", \"related_word3\"],\n"
+              "  \"synonyms\": [\"synonym1\", \"synonym2\"],\n"
+              "  \"example_en\": \"English example sentence\",\n"
+              "  \"example_vi\": \"Vietnamese translation of example\",\n"
+              "  \"confidence\": 0.95\n"
+              "}"
       ),
     );
 
@@ -50,17 +59,28 @@ class GeminiChatService {
       model: 'gemini-2.0-flash',
       apiKey: apiKey,
       systemInstruction: Content.system(
-          "You are an English vocabulary expert. Always analyze the user's word "
-              "and return ONLY JSON:\n"
-              "{"
-              "\"word\": \"the_word\", "
-              "\"definition\": \"clear definition\", "
-              "\"type\": \"noun/verb/etc\", "
-              "\"related\": [\"syn1\", \"syn2\", \"rel\"], "
-              "\"example_en\": \"English example sentence\", "
-              "\"example_vi\": \"Vietnamese example translation\", "
-              "\"confidence\": 0.98"
-              "}"
+          "You are an English-Vietnamese vocabulary expert.\n\n"
+              "IMPORTANT RULES:\n"
+              "1. Detect if the user asks in Vietnamese or English\n"
+              "2. If Vietnamese query → return English word with Vietnamese definition\n"
+              "3. If English query → return Vietnamese word with English definition\n\n"
+              "Return ONLY valid JSON with this structure:\n"
+              "{\n"
+              "  \"word\": \"the main word (English if user asks in Vietnamese, Vietnamese if user asks in English)\",\n"
+              "  \"definition\": \"is the keyword that users ask\",\n"
+              "  \"type\": \"noun/verb/adjective/adverb/etc\",\n"
+              "  \"pronunciation\": \"/IPA pronunciation/ (for English words only)\",\n"
+              "  \"part_of_speech\": \"noun/verb/adjective/etc\",\n"
+              "  \"related\": [\"related_word1\", \"related_word2\", \"related_word3\"],\n"
+              "  \"synonyms\": [\"synonym1\", \"synonym2\", \"synonym3\"],\n"
+              "  \"example_en\": \"Example sentence in English\",\n"
+              "  \"example_vi\": \"Vietnamese translation of the example\",\n"
+              "  \"confidence\": 0.98\n"
+              "}\n\n"
+              "Examples:\n"
+              "User: 'con mèo là gì trong tiếng Anh?' → word: 'cat', definition: 'Con mèo'\n"
+              "User: 'what is beautiful in Vietnamese?' → word: 'đẹp', definition: 'Beautiful'\n"
+
       ),
     );
 
@@ -78,8 +98,8 @@ class GeminiChatService {
               "OR\n"
               "{\"label\": \"normal_chat\"}\n\n"
               "A vocab_query means the user is asking for definition, meaning, "
-              "explanation, synonyms, usage, or vocabulary info of a word/phrase — "
-              "even if misspelled."
+              "explanation, synonyms, usage, translation, or vocabulary info of a word/phrase "
+              "(in English or Vietnamese) — even if misspelled."
       ),
     );
   }
@@ -132,7 +152,7 @@ class GeminiChatService {
   Future<Map<String, dynamic>?> analyzeVocabulary(String message) async {
     try {
       final resp = await _vocabModel.generateContent([
-        Content.text("Analyze this word: $message")
+        Content.text(message)
       ]);
 
       if (resp.text == null) return null;
@@ -157,8 +177,8 @@ class GeminiChatService {
       final bytes = await image.readAsBytes();
 
       final finalPrompt = prompt.isEmpty
-          ? "Identify the main object in this image."
-          : prompt;
+          ? "Identify the main object in this image and provide vocabulary information."
+          : "Identify: $prompt";
 
       final resp = await _imageModel.generateContent([
         Content.multi([

@@ -1,3 +1,4 @@
+// lib/screens/docks/edit_deck/edit_deck_screen.dart
 import 'package:flutter/material.dart';
 import 'package:vocab_ai/models/deck.dart';
 import 'package:vocab_ai/models/flashcard.dart';
@@ -5,7 +6,6 @@ import 'package:vocab_ai/screens/docks/edit_deck/widgets/word_form_dialog.dart';
 import 'dart:io';
 
 import 'package:vocab_ai/services/firebase_service.dart';
-
 
 class EditDeckScreen extends StatefulWidget {
   final Deck deck;
@@ -77,6 +77,7 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
               imageUrl: imageUrl,
             );
 
+            // createFlashcard đã tự động cập nhật deck stats
             await _firebaseService.createFlashcard(newCard, widget.deck.id);
             await _loadCards();
 
@@ -148,6 +149,7 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
               imageUrl: imageUrl,
             );
 
+            // updateFlashcard đã tự động cập nhật deck stats
             await _firebaseService.updateFlashcard(updatedCard);
             await _loadCards();
 
@@ -210,12 +212,16 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
 
     if (confirm == true) {
       try {
+        // deleteFlashcard đã tự động cập nhật deck stats
         await _firebaseService.deleteFlashcard(card.id);
+
+        // Reload cards để cập nhật UI
         await _loadCards();
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Word deleted'),
+              content: Text('Word deleted successfully'),
               backgroundColor: Colors.red,
             ),
           );
@@ -223,7 +229,10 @@ class _EditDeckScreenState extends State<EditDeckScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting card: $e')),
+            SnackBar(
+              content: Text('Error deleting card: $e'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       }
