@@ -15,45 +15,53 @@ class QuizScreen extends StatefulWidget {
 
 class _QuizScreenState extends State<QuizScreen> {
   final FirebaseService _firebaseService = FirebaseService();
-  List<Deck> _decks = [];
-  bool _isLoading = true;
+  final Set<String> _selectedDeckIds = {};
 
   @override
   void initState() {
     super.initState();
     if (widget.deck != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showQuizTypeSelection(widget.deck!);
+        _showQuizTypeSelection([widget.deck!]);
       });
-    } else {
-      _loadDecks();
     }
   }
 
-  Future<void> _loadDecks() async {
-    try {
-      final decks = await _firebaseService.getDecksStream().first;
-      if (mounted) {
-        setState(() {
-          _decks = decks;
-          _isLoading = false;
-        });
+  void _toggleDeckSelection(String deckId) {
+    setState(() {
+      if (_selectedDeckIds.contains(deckId)) {
+        _selectedDeckIds.remove(deckId);
+      } else {
+        _selectedDeckIds.add(deckId);
       }
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading decks: $e')),
-      );
-    }
+    });
   }
 
-  void _showQuizTypeSelection(Deck deck) {
+  void _showQuizTypeSelection(List<Deck> decks) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => QuizTypeSelectionScreen(deck: deck),
+        builder: (_) => QuizTypeSelectionScreen(decks: decks),
       ),
     );
+  }
+
+  void _startQuizWithSelectedDecks(List<Deck> allDecks) {
+    final selectedDecks = allDecks
+        .where((deck) => _selectedDeckIds.contains(deck.id))
+        .toList();
+
+    if (selectedDecks.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one deck'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    _showQuizTypeSelection(selectedDecks);
   }
 
   @override
@@ -64,47 +72,167 @@ class _QuizScreenState extends State<QuizScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _decks.isEmpty
-          ? _buildEmptyState()
-          : SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      body: StreamBuilder<List<Deck>>(
+        stream: _firebaseService.getDecksStream(),
+        builder: (context, snapshot) {
+          // Loading state
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // Error state
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red[300],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error loading decks',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      snapshot.error.toString(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          // Empty state
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return _buildEmptyState();
+          }
+
+          // Data loaded - show decks
+          final decks = snapshot.data!;
+
+          return Column(
             children: [
-              const Text(
-                'Take a Quiz',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Take a Quiz',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Select one or more decks to test your knowledge',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Select Decks',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (_selectedDeckIds.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple.shade50,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${_selectedDeckIds.length} selected',
+                                  style: const TextStyle(
+                                    color: Colors.purple,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        ...decks.map((deck) => QuizDeckCard(
+                          deck: deck,
+                          isSelected: _selectedDeckIds.contains(deck.id),
+                          onTap: () => _toggleDeckSelection(deck.id),
+                        )),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Test your knowledge with interactive quizzes',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
+              // Bottom button
+              if (_selectedDeckIds.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                  child: SafeArea(
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => _startQuizWithSelectedDecks(decks),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Start Quiz (${_selectedDeckIds.length} ${_selectedDeckIds.length == 1 ? 'deck' : 'decks'})',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 32),
-              const Text(
-                'Select a Deck',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ..._decks.map((deck) => QuizDeckCard(
-                deck: deck,
-                onTap: () => _showQuizTypeSelection(deck),
-              )),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }

@@ -4,7 +4,7 @@ import 'package:vocab_ai/screens/docks/widgets/deck_settings_bottomsheet.dart';
 import 'package:vocab_ai/widgets/app_bottom_nav.dart';
 import '../../models/deck.dart';
 import '../../services/firebase_service.dart';
-import 'edit_deck_screen.dart';
+import 'edit_deck/edit_deck_screen.dart';
 
 
 class DecksScreen extends StatefulWidget {

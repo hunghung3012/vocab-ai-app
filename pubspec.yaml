@@ -43,11 +43,6 @@ dependencies:
   share_plus: ^9.0.0
   saf: ^1.0.4
 
-    # Image handling
-
-  # UI
-
-  # AI & ML
   google_generative_ai: ^0.4.6
   image_picker: ^1.1.2
   google_ml_kit: ^0.18.0
@@ -60,7 +55,7 @@ dependencies:
   provider: ^6.1.2
 
   # Other
-  intl: ^0.19.0
+  intl: ^0.20.2
   shared_preferences: ^2.2.3
 
   file_picker: ^8.0.0
@@ -73,8 +68,8 @@ dependencies:
   permission_handler: ^12.0.1
   
   google_sign_in: ^7.2.0
-
-
+  url_launcher: ^6.3.1
+  flutter_quill: ^9.2.3
 
 dev_dependencies:
   flutter_test:

@@ -5,8 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:vocab_ai/models/chat_message.dart';
 import 'package:vocab_ai/models/vocab_model.dart';
 import 'package:vocab_ai/screens/chat_ai/service/chat_service.dart';
-
-// Import các Widgets đã tách
 import 'widgets/chat_bubble.dart';
 import 'widgets/chat_input_area.dart';
 import 'widgets/image_source_sheet.dart';
@@ -91,10 +89,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // ... (Giữ nguyên logic _startTypingTimer, _handleSend, _handleImageAnalysis,
-  //      _handleVocabQuery, _streamTextResponse từ code cũ của bạn) ...
-
-  // Mình paste lại các hàm logic này để đảm bảo file chạy được ngay:
   void _startTypingTimer(int messageIndex) {
     _typingTimer?.cancel();
     _typingTimer = Timer.periodic(const Duration(milliseconds: 20), (timer) {
@@ -242,24 +236,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _handleAddToVocab(VocabResult result) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 8),
-            Expanded(child: Text("✅ '${result.word}' added to deck!")),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -283,21 +259,32 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline, color: Colors.black87),
             onPressed: () {
-              // Dialog hướng dẫn đơn giản, để ở đây cũng được hoặc tách file nếu muốn
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Row(children: [Icon(Icons.help_outline, color: Color(0xFF6F47EB)), SizedBox(width: 8), Text("How to use")]),
-                  content: const Text("📸 Send photos\n💬 Ask about words\n💡 Chat normally"),
-                  actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Got it!"))],
+                  title: const Row(
+                    children: [
+                      Icon(Icons.help_outline, color: Color(0xFF6F47EB)),
+                      SizedBox(width: 8),
+                      Text("How to use"),
+                    ],
+                  ),
+                  content: const Text(
+                    "📸 Send photos to identify objects\n"
+                        "💬 Ask about words and phrases\n"
+                        "💡 Chat naturally for help\n"
+                        "📚 Add words to your decks",
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Got it!"),
+                    ),
+                  ],
                 ),
               );
             },
@@ -313,9 +300,7 @@ class _ChatScreenState extends State<ChatScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               itemBuilder: (_, i) => ChatBubble(
                 message: _messages[i],
-                onAddToVocab: () => _messages[i].vocabResult != null
-                    ? _handleAddToVocab(_messages[i].vocabResult!)
-                    : null,
+                onAddToVocab: () {}, // No longer needed, handled in VocabResultCard
               ),
             ),
           ),

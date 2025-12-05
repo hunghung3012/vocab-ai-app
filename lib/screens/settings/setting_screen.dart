@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vocab_ai/screens/authentication/login_screen.dart';
 import 'package:vocab_ai/screens/authentication/service/auth_service.dart';
+import 'package:vocab_ai/screens/settings/account/account_screen.dart';
 import 'package:vocab_ai/screens/settings/appearance_settings/appearance_settings_screen.dart';
 import 'package:vocab_ai/screens/settings/help_support/help_support_screen.dart';
 import 'package:vocab_ai/screens/settings/notifications_settings/notifications_settings_screen.dart';
@@ -41,13 +42,36 @@ class SettingsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Settings',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+            Row(
+            children: [
+            IconButton(
+            onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.grey.withOpacity(0.1),
+            padding: const EdgeInsets.all(8),
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Text(
+            'Settings',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        ],
+      ),
+        // ✅ VÀ SỬA subtitle này thêm padding
+        const Padding(
+          padding: EdgeInsets.only(left: 56),
+          child: Text(
+            'Manage your account and preferences',
+            style: TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+        ),
                 const SizedBox(height: 4),
                 const Text(
                   'Manage your account and preferences',
@@ -91,9 +115,20 @@ class SettingsScreen extends StatelessWidget {
             context,
             icon: Icons.person,
             title: 'Account',
-            subtitle: user?.email ?? 'Anonymous',
+            // 🔥 Sửa subtitle thành FutureBuilder để hiển thị tên thật
+            subtitle: 'Profile & Interests', // Hoặc bạn có thể dùng FutureBuilder để load tên
             isFirst: true,
-            onTap: () {},
+            onTap: () {
+              // 🔥 Navigate tới AccountScreen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AccountScreen(),
+                ),
+              ).then((_) {
+                // Có thể thêm logic reload nếu cần cập nhật tên ở màn hình này ngay lập tức
+              });
+            },
           ),
           _buildSettingsItem(
             context,

@@ -5,9 +5,9 @@ import '../../services/firebase_service.dart';
 import 'widgets/quiz_option_card.dart';
 
 class MultipleChoiceQuizScreen extends StatefulWidget {
-  final Deck deck;
+  final List<Deck> decks;
 
-  const MultipleChoiceQuizScreen({Key? key, required this.deck})
+  const MultipleChoiceQuizScreen({Key? key, required this.decks})
       : super(key: key);
 
   @override
@@ -34,27 +34,33 @@ class _MultipleChoiceQuizScreenState extends State<MultipleChoiceQuizScreen> {
 
   Future<void> _loadQuiz() async {
     try {
-      final cards = await _firebaseService.getFlashcardsByDeck(widget.deck.id);
+      List<Flashcard> allCards = [];
 
-      if (cards.isEmpty) {
+      // Load flashcards from all selected decks
+      for (var deck in widget.decks) {
+        final cards = await _firebaseService.getFlashcardsByDeck(deck.id);
+        allCards.addAll(cards);
+      }
+
+      if (allCards.isEmpty) {
         setState(() {
-          _errorMessage = 'This deck has no flashcards yet. Add some cards first!';
+          _errorMessage = 'No flashcards found in the selected deck(s). Add some cards first!';
           _isLoading = false;
         });
         return;
       }
 
-      if (cards.length < 4) {
+      if (allCards.length < 4) {
         setState(() {
-          _errorMessage = 'This deck needs at least 4 flashcards to take a quiz.';
+          _errorMessage = 'You need at least 4 flashcards across all selected decks to take a quiz.';
           _isLoading = false;
         });
         return;
       }
 
-      cards.shuffle();
+      allCards.shuffle();
       setState(() {
-        _cards = cards.take(20).toList();
+        _cards = allCards.take(20).toList();
         _isLoading = false;
       });
       _generateOptions();
@@ -72,7 +78,7 @@ class _MultipleChoiceQuizScreenState extends State<MultipleChoiceQuizScreen> {
     final currentCard = _cards[_currentIndex];
     final correctAnswer = currentCard.definition;
 
-    // Lấy tất cả các cards khác
+    // Get all other cards
     final otherCards = _cards.where((c) => c.id != currentCard.id).toList();
 
     if (otherCards.length < 3) {
@@ -161,6 +167,24 @@ class _MultipleChoiceQuizScreenState extends State<MultipleChoiceQuizScreen> {
             ),
             const SizedBox(height: 8),
             Text('$percentage%', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: Colors.grey[700])),
+            if (widget.decks.length > 1) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.purple.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'From ${widget.decks.length} decks',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.purple.shade700,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
         actions: [
@@ -183,7 +207,10 @@ class _MultipleChoiceQuizScreenState extends State<MultipleChoiceQuizScreen> {
               _cards.shuffle();
               _generateOptions();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple,
+                foregroundColor: Colors.white
+            ),
             child: const Text('Retry'),
           ),
         ],
@@ -283,7 +310,10 @@ class _MultipleChoiceQuizScreenState extends State<MultipleChoiceQuizScreen> {
                 ),
                 child: Text(
                   'Score: $_score',
-                  style: const TextStyle(color: Colors.purple, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      color: Colors.purple,
+                      fontWeight: FontWeight.bold
+                  ),
                 ),
               ),
             ),
@@ -339,7 +369,7 @@ class _MultipleChoiceQuizScreenState extends State<MultipleChoiceQuizScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Danh sách đáp án sử dụng QuizOptionCard
+                  // Options list
                   ..._options.asMap().entries.map((entry) {
                     final index = entry.key;
                     final option = entry.value;
@@ -353,7 +383,7 @@ class _MultipleChoiceQuizScreenState extends State<MultipleChoiceQuizScreen> {
                     );
                   }).toList(),
 
-                  // Phần hiển thị kết quả đúng/sai dưới cùng
+                  // Result display
                   if (_isAnswered)
                     Container(
                       margin: const EdgeInsets.only(top: 16),

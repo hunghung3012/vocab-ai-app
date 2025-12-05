@@ -8,6 +8,9 @@ class VocabResult {
   final double confidence;
   final String? exampleEn;  // Câu ví dụ tiếng Anh
   final String? exampleVi;  // Câu ví dụ tiếng Việt
+  final String? pronunciation;  // Phát âm
+  final String? partOfSpeech;  // Loại từ (noun, verb, adjective, etc.)
+  final List<String>? synonyms;  // Từ đồng nghĩa
 
   VocabResult({
     required this.word,
@@ -17,6 +20,9 @@ class VocabResult {
     this.confidence = 1.0,
     this.exampleEn,
     this.exampleVi,
+    this.pronunciation,
+    this.partOfSpeech,
+    this.synonyms,
   });
 
   factory VocabResult.fromJson(Map<String, dynamic> json) {
@@ -28,6 +34,9 @@ class VocabResult {
       confidence: (json['confidence'] ?? 1.0).toDouble(),
       exampleEn: json['example_en'],
       exampleVi: json['example_vi'],
+      pronunciation: json['pronunciation'],
+      partOfSpeech: json['part_of_speech'] ?? json['partOfSpeech'] ?? json['type'],
+      synonyms: (json['synonyms'] as List?)?.map((e) => e.toString()).toList(),
     );
   }
 
@@ -40,7 +49,9 @@ class VocabResult {
       'confidence': confidence,
       'example_en': exampleEn,
       'example_vi': exampleVi,
+      'pronunciation': pronunciation,
+      'part_of_speech': partOfSpeech,
+      'synonyms': synonyms,
     };
   }
 }
-

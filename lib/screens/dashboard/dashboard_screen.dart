@@ -5,7 +5,7 @@ import 'package:vocab_ai/screens/dashboard/widgets/DashedButton.dart';
 import 'package:vocab_ai/widgets/app_bottom_nav.dart';
 import '../../models/deck.dart';
 import '../../services/firebase_service.dart';
-import '../docks/edit_deck_screen.dart';
+import '../docks/edit_deck/edit_deck_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
