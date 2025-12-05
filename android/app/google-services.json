@@ -12,7 +12,20 @@
           "package_name": "com.example.vocab_ai"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "102483333758-hu5bsl608m135imlgp2blfihj0cb6ipg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.vocab_ai",
+            "certificate_hash": "059a2430e32c76b124dd856f1a86346a90df0b07"
+          }
+        },
+        {
+          "client_id": "102483333758-466raq9lh98gv847imd17bv21e6ijstj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDdAxto3R1jZZzgbpFGuPZaZr_VL-OP3OQ"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "102483333758-466raq9lh98gv847imd17bv21e6ijstj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
