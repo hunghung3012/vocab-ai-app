@@ -64,12 +64,13 @@ class VocabAIApp extends StatelessWidget {
           useMaterial3: true,
           fontFamily: 'Inter',
           colorScheme: ColorScheme.fromSeed(
-            seedColor: seed,
+            seedColor: Colors.white,
             brightness: Brightness.light,
           ),
         ),
 
         darkTheme: ThemeData(
+
         useMaterial3: true,
         fontFamily: 'Inter',
         colorScheme: ColorScheme.fromSeed(
