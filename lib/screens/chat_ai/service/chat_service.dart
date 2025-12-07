@@ -84,9 +84,7 @@ class GeminiChatService {
       ),
     );
 
-    // =========================
-    // MODEL PHÂN LOẠI INTENT
-    // =========================
+
     _intentModel = GenerativeModel(
       model: 'gemini-2.0-flash',
       apiKey: apiKey,
@@ -105,7 +103,7 @@ class GeminiChatService {
   }
 
   // --------------------------------------------------
-  // 🔍 HÀM PHÂN LOẠI Ý ĐỊNH
+  // HÀM PHÂN LOẠI Ý ĐỊNH
   // --------------------------------------------------
   Future<bool> _isVocabIntent(String message) async {
     try {

@@ -51,13 +51,13 @@ class VocabAIApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final seed = const Color(0xFF53B175);
-    // ✅ Listen to theme changes
+    //  Listen to theme changes
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(
           title: 'VocabAI',
           debugShowCheckedModeBanner: false,
-          // ✅ Dynamic theme based on ThemeProvider
+          // Dynamic theme based on ThemeProvider
 
 
         theme: ThemeData(
